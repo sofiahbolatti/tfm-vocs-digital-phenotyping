@@ -15,13 +15,12 @@ Estructura del Excel (hoja unica "metabolites both exp."):
 - Nombre de columna de muestra: "{experimento}_{genotipo} {timepoint}_{replica}.cmp"
   ej: "1_Pinot Noir 0dpi_1.cmp", "2_Solaris 6dpi_01.cmp"
 
-Mapeo biologico (confirmado contra el paper original):
+Mapeo biologico:
 - 0dpi = control (antes de inoculacion), 6dpi = infectado con P. viticola (6 dias post-inoculacion)
 - Genotipos: Pinot Noir (V. vinifera, susceptible), BC4 (hibrido M. rotundifolia x
   V. vinifera, resistente), Kober 5BB / K5BB y SO4 (hibridos V. berlandieri x
   V. riparia, resistentes), Solaris (cultivar moderno, resistente)
-- experimento 1 y 2 = dos repeticiones del experimento en invernadero (no son
-  timepoints ni replicas bioquimicas, son repeticiones experimentales completas)
+- experimento 1 y 2 = dos repeticiones del experimento en invernadero (son repeticiones experimentales completas)
 """
 
 import re
@@ -33,7 +32,7 @@ import openpyxl
 import pandas as pd
 
 # ---------------------------------------------------------------------------
-# Configuracion
+# Configuracion: parámetros fijos del script
 # ---------------------------------------------------------------------------
 
 EXCEL_PATH = "/mnt/user-data/uploads/Metabolites_for_Christoph__2020_12_26_11_42_48_UTC___1_.xlsx"
@@ -62,18 +61,18 @@ DPI_TO_STATE = {0: "control", 6: "infected"}
 
 
 # ---------------------------------------------------------------------------
-# Paso 1: leer el Excel
+# Paso 1: leer el Excel y armar una tabla de Pandas
 # ---------------------------------------------------------------------------
 
 def read_excel_raw(path: str, sheet: str) -> pd.DataFrame:
-    """Lee la hoja del Excel tal cual, sin asumir tipos (openpyxl + valores)."""
+    """Lee la hoja del Excel tal cual"""
     wb = openpyxl.load_workbook(path, data_only=True)
     ws = wb[sheet]
     header = [ws.cell(row=1, column=c).value for c in range(1, ws.max_column + 1)]
     rows = []
     for r in range(2, ws.max_row + 1):
         values = [ws.cell(row=r, column=c).value for c in range(1, ws.max_column + 1)]
-        # Saltar filas vacias o de metadata de instrumento (footer del export)
+        # Saltar filas vacias o de metadata de instrumento
         if values[0] is None:
             continue
         rows.append(values)
@@ -82,7 +81,8 @@ def read_excel_raw(path: str, sheet: str) -> pd.DataFrame:
 
 
 def parse_sample_columns(columns: list[str]) -> pd.DataFrame:
-    """Parsea los nombres de columna de muestra a sus componentes."""
+    """Desarma cada nombre de columna en sus piezas: experimento, genotipo, 
+    pdi y réplica."""
     parsed = []
     for col in columns:
         m = SAMPLE_COL_PATTERN.match(col)
@@ -101,9 +101,9 @@ def parse_sample_columns(columns: list[str]) -> pd.DataFrame:
     return pd.DataFrame(parsed)
 
 
-# ---------------------------------------------------------------------------
-# Paso 2: construir tabla de muestras (metadatos)
-# ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------------
+# Paso 2: construir tabla de muestras (metadatos). Gernerar un PK y agregar los metadatos fijos
+# ---------------------------------------------------------------------------------------------
 
 def build_muestras(sample_meta: pd.DataFrame) -> pd.DataFrame:
     df = sample_meta.copy()
@@ -155,9 +155,9 @@ def build_muestras(sample_meta: pd.DataFrame) -> pd.DataFrame:
     return df[cols]
 
 
-# ---------------------------------------------------------------------------
-# Paso 3: construir catalogo de compuestos
-# ---------------------------------------------------------------------------
+# --------------------------------------------------------------------------------------------
+# Paso 3: construir catalogo de compuestos, generar una PK y marcar identificados vs no match
+# --------------------------------------------------------------------------------------------
 
 def build_compuestos(raw_df: pd.DataFrame) -> pd.DataFrame:
     meta_cols = [
@@ -216,7 +216,7 @@ def build_abundancias(raw_df: pd.DataFrame, sample_meta: pd.DataFrame, compuesto
 
 
 # ---------------------------------------------------------------------------
-# Paso 5: persistir en SQLite + Parquet
+# Paso 5: guardar en SQLite + Parquet
 # ---------------------------------------------------------------------------
 
 def save_to_sqlite(muestras: pd.DataFrame, compuestos: pd.DataFrame, db_path: str) -> None:
@@ -233,7 +233,7 @@ def save_to_parquet(abundancias: pd.DataFrame, parquet_path: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Main
+# Main: impimir un respumen 
 # ---------------------------------------------------------------------------
 
 def main():
