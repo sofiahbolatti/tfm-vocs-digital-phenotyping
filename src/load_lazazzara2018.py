@@ -15,12 +15,13 @@ Estructura del Excel (hoja unica "metabolites both exp."):
 - Nombre de columna de muestra: "{experimento}_{genotipo} {timepoint}_{replica}.cmp"
   ej: "1_Pinot Noir 0dpi_1.cmp", "2_Solaris 6dpi_01.cmp"
 
-Mapeo biologico:
+Mapeo biologico (confirmado contra el paper original):
 - 0dpi = control (antes de inoculacion), 6dpi = infectado con P. viticola (6 dias post-inoculacion)
 - Genotipos: Pinot Noir (V. vinifera, susceptible), BC4 (hibrido M. rotundifolia x
   V. vinifera, resistente), Kober 5BB / K5BB y SO4 (hibridos V. berlandieri x
   V. riparia, resistentes), Solaris (cultivar moderno, resistente)
-- experimento 1 y 2 = dos repeticiones del experimento en invernadero (son repeticiones experimentales completas)
+- experimento 1 y 2 = dos repeticiones del experimento en invernadero (no son
+  timepoints ni replicas bioquimicas, son repeticiones experimentales completas)
 """
 
 import re
@@ -32,7 +33,7 @@ import openpyxl
 import pandas as pd
 
 # ---------------------------------------------------------------------------
-# Configuracion: parámetros fijos del script
+# Configuracion
 # ---------------------------------------------------------------------------
 
 EXCEL_PATH = "/mnt/user-data/uploads/Metabolites_for_Christoph__2020_12_26_11_42_48_UTC___1_.xlsx"
@@ -59,20 +60,33 @@ GENOTYPE_NOTES = {
 SAMPLE_COL_PATTERN = re.compile(r"^(\d+)_(.+) (\d+)dpi_(\d+)\.cmp$")
 DPI_TO_STATE = {0: "control", 6: "infected"}
 
+# Mapeo manual compuesto identificado -> PubChem CID (buscado por CAS, confirmado
+# contra paginas oficiales de PubChem/proveedores). Los compuestos "No match"
+# (picos sin identificar) y los que carecen de CAS (ej. Epizonarene) quedan
+# sin CID porque no hay nada que buscar.
+PUBCHEM_CID_BY_INDEX = {
+    1: 637566, 2: 5364752, 3: 521334, 4: 92313, 5: 441005, 6: 442393,
+    7: 31253, 8: 6549, 9: 638014, 10: 9895, 11: 5281515, 12: 11463,
+    13: 12306047, 14: 92762, 15: 23204, 16: 31291, 17: 31289, 18: 92812,
+    19: 6428573, 20: 6184, 21: 20861, 23: 6782, 24: 6432173, 25: 8175,
+    26: 244, 27: 6054, 28: 998, 29: 549664, 30: 637564, 31: 5283321,
+    32: 8723, 33: 19602, 34: 5364920, 35: 18554, 36: 957,
+}
+
 
 # ---------------------------------------------------------------------------
-# Paso 1: leer el Excel y armar una tabla de Pandas
+# Paso 1: leer el Excel
 # ---------------------------------------------------------------------------
 
 def read_excel_raw(path: str, sheet: str) -> pd.DataFrame:
-    """Lee la hoja del Excel tal cual"""
+    """Lee la hoja del Excel tal cual, sin asumir tipos (openpyxl + valores)."""
     wb = openpyxl.load_workbook(path, data_only=True)
     ws = wb[sheet]
     header = [ws.cell(row=1, column=c).value for c in range(1, ws.max_column + 1)]
     rows = []
     for r in range(2, ws.max_row + 1):
         values = [ws.cell(row=r, column=c).value for c in range(1, ws.max_column + 1)]
-        # Saltar filas vacias o de metadata de instrumento
+        # Saltar filas vacias o de metadata de instrumento (footer del export)
         if values[0] is None:
             continue
         rows.append(values)
@@ -81,8 +95,7 @@ def read_excel_raw(path: str, sheet: str) -> pd.DataFrame:
 
 
 def parse_sample_columns(columns: list[str]) -> pd.DataFrame:
-    """Desarma cada nombre de columna en sus piezas: experimento, genotipo, 
-    pdi y réplica."""
+    """Parsea los nombres de columna de muestra a sus componentes."""
     parsed = []
     for col in columns:
         m = SAMPLE_COL_PATTERN.match(col)
@@ -101,9 +114,9 @@ def parse_sample_columns(columns: list[str]) -> pd.DataFrame:
     return pd.DataFrame(parsed)
 
 
-# ---------------------------------------------------------------------------------------------
-# Paso 2: construir tabla de muestras (metadatos). Gernerar un PK y agregar los metadatos fijos
-# ---------------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Paso 2: construir tabla de muestras (metadatos)
+# ---------------------------------------------------------------------------
 
 def build_muestras(sample_meta: pd.DataFrame) -> pd.DataFrame:
     df = sample_meta.copy()
@@ -155,9 +168,9 @@ def build_muestras(sample_meta: pd.DataFrame) -> pd.DataFrame:
     return df[cols]
 
 
-# --------------------------------------------------------------------------------------------
-# Paso 3: construir catalogo de compuestos, generar una PK y marcar identificados vs no match
-# --------------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Paso 3: construir catalogo de compuestos
+# ---------------------------------------------------------------------------
 
 def build_compuestos(raw_df: pd.DataFrame) -> pd.DataFrame:
     meta_cols = [
@@ -174,7 +187,7 @@ def build_compuestos(raw_df: pd.DataFrame) -> pd.DataFrame:
     df = raw_df[meta_cols].copy().reset_index(drop=True)
     df.insert(0, "compuesto_id", [f"{DATASET_ORIGIN.lower()}_cmp{i+1:03d}" for i in df.index])
     df["identified"] = df["Metabolite"].apply(lambda x: not str(x).startswith("No match"))
-    df["pubchem_cid"] = None  # a completar en paso de estandarizacion VOC -> PubChem CID
+    df["pubchem_cid"] = [PUBCHEM_CID_BY_INDEX.get(i + 1) for i in df.index]
     df = df.rename(
         columns={
             "Metabolite": "name_original",
@@ -216,7 +229,7 @@ def build_abundancias(raw_df: pd.DataFrame, sample_meta: pd.DataFrame, compuesto
 
 
 # ---------------------------------------------------------------------------
-# Paso 5: guardar en SQLite + Parquet
+# Paso 5: persistir en SQLite + Parquet
 # ---------------------------------------------------------------------------
 
 def save_to_sqlite(muestras: pd.DataFrame, compuestos: pd.DataFrame, db_path: str) -> None:
@@ -233,7 +246,7 @@ def save_to_parquet(abundancias: pd.DataFrame, parquet_path: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Main: impimir un respumen 
+# Main
 # ---------------------------------------------------------------------------
 
 def main():
@@ -242,7 +255,7 @@ def main():
     sample_cols = [c for c in raw_df.columns if c not in (
         "Metabolite", "CAS", "Source", "Score", "Quantification Ions",
         "Avg. RI", "Avg. RT (Min)", "Avg.S/N", "Hits",
-   "]
+    )]
     sample_meta = parse_sample_columns(sample_cols)
 
     muestras = build_muestras(sample_meta)
