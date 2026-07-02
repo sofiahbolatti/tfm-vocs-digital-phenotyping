@@ -34,6 +34,36 @@ ANALYTICAL_TECHNIQUE = "TD-GC/MS"
 TISSUE = "leaves"
 SPECIES = "Hordeum vulgare"
 
+# Mapeo compuesto identificado -> PubChem CID (buscado y verificado en PubChem
+# por nombre/CAS). Los 25 VOCs de este dataset estan identificados .
+
+PUBCHEM_CID_BY_NAME = {
+    "(Z)-3-Hexenol": 5281167,
+    "(Z)-3-Hexenyl acetate": 5363388,
+    "2-Ethyl hexanol": 7720,
+    "3-Heptanol": 11520,
+    "3-Heptanone": 7802,
+    "6-Methyl-5-heptenone": 9862,
+    "Heptane 2.3-dimethyl": 26375,
+    "Heptane 2.2.4.6.6-pentamethyl": 26058,
+    "Nonane": 8141,
+    "Nonanal": 31289,
+    "n-Decanal": 8175,
+    "Decane-4-methyl": 17835,
+    "Dodecane": 8182,
+    "n-Tetradecane": 12389,
+    "a-Pinene": 6654,
+    "para-Cymene": 7463,
+    "Camphene": 6616,
+    "Limonene": 22311,
+    "1.8-Cineol": 2758,
+    "Linalool": 6549,
+    "Camphor": 2537,
+    "(-)-Menthol": 16666,
+    "Bornyl acetate": 6448,
+    "b-Caryophyllene": 5281515,
+    "Methyl salicylate": 4133,
+}
 
 #---------------------------------------------------------------------------
 # Paso 1: Leer el csv
@@ -102,7 +132,7 @@ def build_compuestos(voc_data):
             "name_original": name,
             "cas": None,
             "identified": True,
-            "pubchem_cid": None,
+            "pubchem_cid": PUBCHEM_CID_BY_NAME.get(name),
             "dataset_origin": DATASET_ORIGIN,
         })
     return pd.DataFrame(rows)
@@ -137,11 +167,12 @@ def build_abundancias(voc_data, muestras):
             })
     return pd.DataFrame(long_rows)
 
+
 #---------------------------------------------------------------------------
 # Paso 5: Guardar en SQLite + Parquet
 #----------------------------------------------------------------------------
 
-def save_to_sqlite(muestras, compuestos, db_path):
+ef save_to_sqlite(muestras, compuestos, db_path):
     Path(db_path).parent.mkdir(parents=True, exist_ok=True)
     con = sqlite3.connect(db_path)
     muestras.drop(columns=["raw_label"]).to_sql(
