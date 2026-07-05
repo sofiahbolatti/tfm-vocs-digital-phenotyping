@@ -27,7 +27,7 @@ import pandas as pd
 # Configuración
 #----------------------------------------------------------------------------------
 
-CSV_PATH = "data/raw/MetaboVOC.csv"
+CSV_PATH = "data/raw/Laupheimer/rawdata_laupheimer.csv"
 DATASET_ORIGIN = "Laupheimer2024"
 DOI = "10.1111/ppl.14646"
 ANALYTICAL_TECHNIQUE = "TD-GC/MS"
@@ -192,8 +192,8 @@ def save_to_parquet(abundancias, parquet_path):
 #----------------------------------------------------------------------------
 
 def main():
-    DB_PATH = "output/tfm_vocs.db"
-    PARQUET_PATH = "output/data/processed/abundancias_laupheimer2024.parquet"
+   DB_PATH = "db/tfm_vocs.db"
+   PARQUET_PATH = "db/data/processed/abundancias_laupheimer2024.parquet"
 
     voc_data, sample_labels = read_csv_raw(CSV_PATH)
     sample_numbers = list(range(1, len(sample_labels) + 1))
