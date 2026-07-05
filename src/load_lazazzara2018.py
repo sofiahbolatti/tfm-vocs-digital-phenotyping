@@ -36,11 +36,11 @@ import pandas as pd
 # Configuracion
 # ---------------------------------------------------------------------------
 
-EXCEL_PATH = "/mnt/user-data/uploads/Metabolites_for_Christoph__2020_12_26_11_42_48_UTC___1_.xlsx"
+EXCEL_PATH = "data/raw/Lazazzara/rawdata_lazazzara.xlsx"
 SHEET_NAME = "metabolites both exp."
 
-DB_PATH = "/home/claude/output/tfm_vocs.db"
-PARQUET_DIR = "/home/claude/output/data/processed"
+DB_PATH = "db/tfm_vocs.db"
+PARQUET_DIR = "db/data/processed"
 PARQUET_PATH = f"{PARQUET_DIR}/abundancias_lazazzara2018.parquet"
 
 DATASET_ORIGIN = "Lazazzara2018"
