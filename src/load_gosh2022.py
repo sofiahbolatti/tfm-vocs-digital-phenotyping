@@ -25,10 +25,10 @@ import pandas as pd
 # Configuracion
 # ---------------------------------------------------------------------------
 
-EXCEL_PATH = "data/raw/insects-1892196-supplementary.xlsx"
+EXCEL_PATH = "data/raw/Ghosh/rawdata_ghosh.xlsx"
 
-DB_PATH = "output/tfm_vocs.db"
-PARQUET_DIR = "output/data/processed"
+DB_PATH = "db/tfm_vocs.db"
+PARQUET_DIR = "db/data/processed"
 PARQUET_PATH = f"{PARQUET_DIR}/abundancias_ghosh2022.parquet"
 
 DATASET_ORIGIN = "Ghosh2022"
