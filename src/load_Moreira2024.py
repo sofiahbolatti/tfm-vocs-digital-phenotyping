@@ -31,10 +31,10 @@ import pandas as pd
 # Configuracion
 # ---------------------------------------------------------------------------
 
-CSV_PATH = "data/raw/Table_2_and_3_and_Figure_2._VOC_emission.csv"
+CSV_PATH = "data/raw/Moreira/rawdata_moreira.csv"
 
-DB_PATH = "output/tfm_vocs.db"
-PARQUET_DIR = "output/data/processed"
+DB_PATH = "db/tfm_vocs.db"
+PARQUET_DIR = "db/data/processed"
 PARQUET_PATH = f"{PARQUET_DIR}/abundancias_moreira2024.parquet"
 
 DATASET_ORIGIN = "Moreira2024"
