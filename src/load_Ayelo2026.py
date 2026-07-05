@@ -24,10 +24,10 @@ import pandas as pd
 # Configuracion
 # ---------------------------------------------------------------------------
 
-CSV_PATH = "data/raw/Ayelo et al. Dataset_GCMS-Analysis-of-Cotton-Volatiles.csv"
+CSV_PATH = "data/raw/Ayelo/rawdata_ayelo.csv"
 
-DB_PATH = "output/tfm_vocs.db"
-PARQUET_DIR = "output/data/processed"
+DB_PATH = "db/tfm_vocs.db"
+PARQUET_DIR = "db/data/processed"
 PARQUET_PATH = f"{PARQUET_DIR}/abundancias_ayelo2026.parquet"
 
 DATASET_ORIGIN = "Ayelo2026"
