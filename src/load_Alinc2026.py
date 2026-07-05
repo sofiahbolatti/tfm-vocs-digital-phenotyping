@@ -33,14 +33,14 @@ import pandas as pd
 # Configuracion
 # ---------------------------------------------------------------------------
 
-EXCEL_PATH = "data/raw/Alinc2026_dataset.xlsx"
+EXCEL_PATH = "data/raw/Alinc/rawdata_alinc.xlsx"
 SHEET_NAME = "VOC analysis"
 HEADER_ROW = 4
 FIRST_DATA_ROW = 5
 LAST_DATA_ROW = 27
 
-DB_PATH = "output/tfm_vocs.db"
-PARQUET_DIR = "output/data/processed"
+DB_PATH = "db/tfm_vocs.db"
+PARQUET_DIR = "db/data/processed"
 PARQUET_PATH = f"{PARQUET_DIR}/abundancias_alinc2026.parquet"
 
 DATASET_ORIGIN = "Alinc2026"
