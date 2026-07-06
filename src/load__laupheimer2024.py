@@ -1,4 +1,4 @@
-"""
+﻿"""
 Loader: Laupheimer et al. 2024 (Physiologia Plantarum, DOI 10.1111/ppl.14646)
 Cebada x Blumeria hordei - VOCs por TD-GC/MS
 
@@ -24,7 +24,7 @@ from pathlib import Path
 import pandas as pd
 
 #----------------------------------------------------------------------------------
-# Configuración
+# Configuracion
 #----------------------------------------------------------------------------------
 
 CSV_PATH = "data/raw/Laupheimer/rawdata_laupheimer.csv"
@@ -33,9 +33,6 @@ DOI = "10.1111/ppl.14646"
 ANALYTICAL_TECHNIQUE = "TD-GC/MS"
 TISSUE = "leaves"
 SPECIES = "Hordeum vulgare"
-
-# Mapeo compuesto identificado -> PubChem CID (buscado y verificado en PubChem
-# por nombre/CAS). Los 25 VOCs de este dataset estan identificados .
 
 PUBCHEM_CID_BY_NAME = {
     "(Z)-3-Hexenol": 5281167,
@@ -121,7 +118,7 @@ def build_muestras(sample_labels, sample_numbers):
     return pd.DataFrame(rows)
 
 #---------------------------------------------------------------------------
-# Paso 3: Construir catálogo de compuestos
+# Paso 3: Construir catalogo de compuestos
 #----------------------------------------------------------------------------
 
 def build_compuestos(voc_data):
@@ -172,7 +169,7 @@ def build_abundancias(voc_data, muestras):
 # Paso 5: Guardar en SQLite + Parquet
 #----------------------------------------------------------------------------
 
-ef save_to_sqlite(muestras, compuestos, db_path):
+def save_to_sqlite(muestras, compuestos, db_path):
     Path(db_path).parent.mkdir(parents=True, exist_ok=True)
     con = sqlite3.connect(db_path)
     muestras.drop(columns=["raw_label"]).to_sql(
@@ -192,8 +189,8 @@ def save_to_parquet(abundancias, parquet_path):
 #----------------------------------------------------------------------------
 
 def main():
-   DB_PATH = "db/tfm_vocs.db"
-   PARQUET_PATH = "db/data/processed/abundancias_laupheimer2024.parquet"
+    DB_PATH = "db/tfm_vocs.db"
+    PARQUET_PATH = "db/data/processed/abundancias_laupheimer2024.parquet"
 
     voc_data, sample_labels = read_csv_raw(CSV_PATH)
     sample_numbers = list(range(1, len(sample_labels) + 1))

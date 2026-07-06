@@ -1,0 +1,19 @@
+﻿# Bases de datos y datos procesados (binarios, regenerables desde los loaders)
+db/*.db
+db/data/processed/*.parquet
+
+# Cache de Python
+__pycache__/
+*.pyc
+
+# Checkpoints de Jupyter
+.ipynb_checkpoints/
+
+# Entornos virtuales (si en algún momento se usa uno)
+venv/
+env/
+.venv/
+
+# Archivos de sistema
+.DS_Store
+Thumbs.db
