@@ -168,7 +168,7 @@ def build_species_tables(species_key: str, cfg: dict, df: pd.DataFrame):
             "cas": row["Cas No"],
             "compound_class": row.get("Class"),
             "identified": True,
-            "pubchem_cid": None, 
+            "pubchem_cid": CAS_TO_PUBCHEM_CID.get(row["Cas No"]),
             "dataset_origin": DATASET_ORIGIN,
             "species": species,
         })
@@ -235,7 +235,8 @@ def main():
 
     print()
     print(f"TOTAL muestras: {len(muestras)}")
-    print(f"TOTAL compuestos: {len(compuestos)} (0 con CID por ahora - pendiente)")
+    con_cid = compuestos["pubchem_cid"].notna().sum()
+    print(f"TOTAL compuestos: {len(compuestos)} ({con_cid} con CID)")
     print(f"TOTAL filas de abundancia: {len(abundancias)}")
 
 
