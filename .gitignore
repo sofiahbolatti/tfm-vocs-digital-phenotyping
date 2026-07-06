@@ -17,3 +17,5 @@ env/
 # Archivos de sistema
 .DS_Store
 Thumbs.db
+
+data/raw/**
