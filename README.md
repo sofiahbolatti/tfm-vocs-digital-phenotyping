@@ -21,7 +21,7 @@ Desarrollar un pipeline de machine learning para el fenotipado digital de estado
 2. **Modelo generativo central**: Conditional Variational Autoencoder (CVAE) - aprende un espacio latente condicionado al estado fisiologico
 3. **Deteccion de anomalias**: Isolation Forest - evalua la plausibilidad biologica de perfiles generados por el CVAE
 4. **Reduccion de dimensionalidad / visualizacion**: PCA, t-SNE, UMAP
-5. **Dashboard interactivo** (Plotly/Dash) con seis modulos: exploracion de datos (EDA), predictor, interpretabilidad SHAP, navegador del espacio latente, generador de hipotesis, y actualizador de modelo (reentrenamiento validado por humano)
+5. **Dashboard interactivo** (Flask + Plotly) con seis modulos: exploracion de datos (EDA), predictor, interpretabilidad SHAP, navegador del espacio latente, generador de hipotesis, y actualizador de modelo (reentrenamiento validado por humano)
 
 La combinacion CVAE + Isolation Forest aplicada a perfiles VOC de plantas es una aproximacion no reportada previamente en la literatura de volatilomica.
 
@@ -34,7 +34,7 @@ data/
 db/                  Base de datos SQLite + matrices Parquet
 notebooks/           Notebooks de exploracion y modelado
 src/                 Codigo fuente (carga de datos, pipeline ML, etc.)
-dashboard/           Aplicacion Plotly/Dash
+dashboard/           Aplicacion Flask + Plotly
 docs/                Documentacion, propuesta de TFM, notas
 ```
 
