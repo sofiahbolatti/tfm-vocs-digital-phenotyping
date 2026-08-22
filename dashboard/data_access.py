@@ -236,8 +236,6 @@ from sklearn.model_selection import cross_val_score, StratifiedKFold
 UPLOAD_TMP_DIR = BASE_DIR / "dashboard" / "_uploads_tmp"
 UPLOAD_TMP_DIR.mkdir(exist_ok=True)
 
-ACTUALIZABLES = [s for s in CLASSIFIER_SPECIES if s["slug"] != "ghosh2022"]
-
 
 def load_raw_feature_matrix(slug):
     dataset_origin = DATASET_ORIGIN[slug]
@@ -394,6 +392,8 @@ CLASSIFIER_SPECIES = [
     {"slug": "ghosh2022", "especie": "Solanum lycopersicum + Capsicum annuum (tomate y pimiento)", "dataset": "Ghosh2022"},
     {"slug": "alinc2026", "especie": "Solanum lycopersicum (tomate, con Trichoderma)", "dataset": "Alinc2026"},
 ]
+
+ACTUALIZABLES = [s for s in CLASSIFIER_SPECIES if s["slug"] != "ghosh2022"]
 
 CVAE_SPECIES = [
     {"slug": "lazazzara2018", "especie": "Vitis vinifera (vid)", "tiene_detector": True},
