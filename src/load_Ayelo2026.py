@@ -1,13 +1,7 @@
 """
 Loader: Ayelo et al. 2026 ( DOI 10.1002/ps.70789)
-Algodon (Gossypium hirsutum) x herbivoria por Spodoptera exigua (5 poblaciones
-geograficas: AU8, AU9a, TX1, TX2a, TX3) vs control, cruzado con 2 cultivares
-(RC=resistente, SC=susceptible) - VOCs foliares por GC-MS
-
-NOTA: el dataset es un ensayo de herbivoria con distintas poblaciones de la oruga
-Spodoptera exigua (Beet Armyworm). Las 5 poblaciones se colapsan en un unico
-estado "herbivory_exposed" para consistencia; la poblacion
-especifica se conserva en treatment_group para no perder el dato.
+Algodon (Gossypium hirsutum) x consorcios PGPR (AU8, AU9a, TX1, TX2a, TX3) vs
+control, cruzado con 2 cultivares (RC=resistente, SC=susceptible) - VOCs foliares por GC-MS
 
 Estructura del CSV:
 - Filas 1-3: leyenda (SC/RC) y linea en blanco
@@ -17,7 +11,7 @@ Estructura del CSV:
 
 Diseno biologico:
 - Cultivar: RC (resistente) / SC (susceptible)
-- Treatment: Ctrl o una de 5 poblaciones de S. exigua (AU8, AU9a, TX1, TX2a, TX3)
+- Treatment: Ctrl o uno de 5 consorcios PGPR (AU8, AU9a, TX1, TX2a, TX3)
 """
 
 import sqlite3
@@ -97,7 +91,7 @@ def build_muestras(df: pd.DataFrame) -> pd.DataFrame:
         counters[key] = counters.get(key, 0) + 1
         replicate = counters[key]
 
-        herbivore_population = None if treatment == "Ctrl" else treatment
+        pgpr_consortium = None if treatment == "Ctrl" else treatment
 
         sample_id = (
             DATASET_ORIGIN.lower()
@@ -110,8 +104,8 @@ def build_muestras(df: pd.DataFrame) -> pd.DataFrame:
             "species": SPECIES,
             "cultivar_code": cultivar_code,
             "cultivar_resistance": CULTIVAR_MAP[cultivar_code],
-            "herbivore_population": herbivore_population,
-            "physiological_state": "control" if treatment == "Ctrl" else "herbivory_exposed",
+            "pgpr_consortium": pgpr_consortium,
+            "physiological_state": "control" if treatment == "Ctrl" else "pgpr_treated",
             "treatment_group": treatment,
             "biological_replicate": replicate,
             "voc_total_reported": r["TOTAL"],

@@ -7,7 +7,7 @@ Lazazzara2018 y Laupheimer2024 (comparten esquema via to_sql(if_exists="append")
 Las 4 tablas restantes tienen su propio esquema porque incluyen columnas que
 `muestras` no tiene:
     - muestras_alinc2026   -> fungal_inoculant, herbivore_species, treatment_group, zenodo_doi
-    - muestras_ayelo2026   -> cultivar_code, cultivar_resistance, pgpr_consortium,
+    - muestras_ayelo2026   -> cultivar_code, cultivar_resistance, herbivore_population,
                                treatment_group, voc_total_reported
     - muestras_moreira2024 -> herbivore_species, treatment_group, height_cm,
                                voc_total_reported, dryad_doi, raw_id
@@ -39,7 +39,7 @@ COLUMNAS_MUESTRAS_ACTUALES = {
 
 TABLAS_OUTLIER = {
     "muestras_alinc2026": "herbivoria_biocontrol",
-    "muestras_ayelo2026": "pgpr",
+    "muestras_ayelo2026": "resistencia_cultivar_herbivoria",
     "muestras_moreira2024": "herbivoria",
     "muestras_ghosh2022": "infeccion_viral",
 }
