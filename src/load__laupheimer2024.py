@@ -1,4 +1,4 @@
-﻿"""
+"""
 Loader: Laupheimer et al. 2024 (Physiologia Plantarum, DOI 10.1111/ppl.14646)
 Cebada x Blumeria hordei - VOCs por TD-GC/MS
 
@@ -24,7 +24,7 @@ from pathlib import Path
 import pandas as pd
 
 #----------------------------------------------------------------------------------
-# Configuracion
+# Configuración
 #----------------------------------------------------------------------------------
 
 CSV_PATH = "data/raw/Laupheimer/rawdata_laupheimer.csv"
@@ -33,6 +33,9 @@ DOI = "10.1111/ppl.14646"
 ANALYTICAL_TECHNIQUE = "TD-GC/MS"
 TISSUE = "leaves"
 SPECIES = "Hordeum vulgare"
+
+# Mapeo compuesto identificado -> PubChem CID (buscado y verificado en PubChem
+# por nombre/CAS). Los 25 VOCs de este dataset estan identificados .
 
 PUBCHEM_CID_BY_NAME = {
     "(Z)-3-Hexenol": 5281167,
@@ -118,7 +121,7 @@ def build_muestras(sample_labels, sample_numbers):
     return pd.DataFrame(rows)
 
 #---------------------------------------------------------------------------
-# Paso 3: Construir catalogo de compuestos
+# Paso 3: Construir catálogo de compuestos
 #----------------------------------------------------------------------------
 
 def build_compuestos(voc_data):

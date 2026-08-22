@@ -1,19 +1,13 @@
 # TFM: Digital Phenotyping Based on VOCs to Model Plant-Microorganism Interaction and Plant Resilience Using Machine Learning
 
-Trabajo de Fin de Master — Master de Formacion Permanente en Big Data, Data Science e Inteligencia Artificial (8a edicion), Universidad Complutense de Madrid (UCM), en colaboracion con nticmaster.
+Trabajo de Fin de Master — Master de Formacion Permanente en Big Data, Data Science e Inteligencia Artificial, Universidad Complutense de Madrid (UCM).
 
 **Autora:** Sofia Bolatti
 **Directores:** Dr. Carlos Ortega, Dr. Santiago Mota
 
 ## Objetivo
 
-Desarrollar un pipeline de machine learning para el fenotipado digital de estados fisiologicos de plantas a partir de sus perfiles de compuestos organicos volatiles (VOCs), considerando multiples especies y patogenos:
-
-- **Trigo** x F. culmorum, F. avenaceum, F. graminearum, Parastagonospora nodorum, oidio
-- **Tomate** x T. virens, B. cinerea, control
-- **Vid** x P. viticola, control
-
-(El alcance final depende de los datos que resulten utilizables.)
+Desarrollar un pipeline de machine learning para el fenotipado digital de estados fisiologicos de plantas a partir de sus perfiles de compuestos organicos volatiles (VOCs), considerando multiples especies y diferentes tipos de estrés bióticos.
 
 ## Enfoque metodologico
 
@@ -30,8 +24,8 @@ La combinacion CVAE + Isolation Forest aplicada a perfiles VOC de plantas es una
 ```
 data/
   raw/              Datasets originales sin modificar
-  processed/        Datos limpios y estandarizados
-db/                  Base de datos SQLite + matrices Parquet
+db/                  Base de datos SQLite (tfm_vocs.db) + matrices Parquet/CSV
+  data/processed/    Datos limpios y estandarizados por dataset (abundancias_<dataset>.{csv,parquet})
 notebooks/           Notebooks de exploracion y modelado
 src/                 Codigo fuente (carga de datos, pipeline ML, etc.)
 dashboard/           Aplicacion Flask + Plotly
@@ -47,8 +41,8 @@ Los datos provienen de estudios publicados y de colaboraciones directas con sus 
 
 ## Estado del proyecto
 
-En desarrollo activo - TFM en curso.
+Finaloizado
 
 ## Licencia
 
-Repositorio privado mientras el trabajo esta en curso. Pendiente de definir licencia para publicacion futura.
+Públcia

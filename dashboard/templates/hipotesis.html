@@ -1,0 +1,153 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Generador de hipotesis</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body {
+      background-image: url("{{ url_for('static', filename='fondo_secundario.png') }}");
+      background-size: cover;
+      background-position: top right;
+      background-repeat: no-repeat;
+      background-attachment: fixed;
+      min-height: 100vh;
+    }
+    .content-card {
+      background-color: rgba(255, 255, 255, 0.93);
+      border-radius: 1rem;
+      padding: 2rem;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    }
+    .navbar-glass {
+      background-color: rgba(13, 27, 33, 0.55) !important;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+    .percentil-barra {
+      position: relative;
+      height: 22px;
+      border-radius: 6px;
+      background: linear-gradient(to right,
+        #28a745 0%, #28a745 90%,
+        #ffc107 90%, #ffc107 97.5%,
+        #dc3545 97.5%, #dc3545 100%);
+      margin-top: 0.4rem;
+    }
+    .percentil-marcador {
+      position: absolute;
+      top: -5px;
+      width: 3px;
+      height: 32px;
+      background-color: #000000;
+      transform: translateX(-50%);
+    }
+    .percentil-escala {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.75rem;
+      color: #6c757d;
+      margin-top: 2px;
+    }
+  </style>
+</head>
+<body>
+  <nav class="navbar navbar-expand-md navbar-dark navbar-glass mb-4">
+    <div class="container-fluid">
+      <a class="navbar-brand" href="/">TFM VOCs</a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav">
+          <li class="nav-item"><a class="nav-link" href="/eda">EDA</a></li>
+          <li class="nav-item"><a class="nav-link" href="/predictor">Predictor</a></li>
+          <li class="nav-item"><a class="nav-link" href="/shap">SHAP</a></li>
+          <li class="nav-item"><a class="nav-link active" href="/hipotesis">Hipotesis</a></li>
+          <li class="nav-item"><a class="nav-link" href="/latente">Espacio latente</a></li>
+          <li class="nav-item"><a class="nav-link" href="/actualizar">Actualizar modelo</a></li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container content-card mb-4">
+    <h1 class="mb-4">Generador de hipotesis</h1>
+
+    <form method="get" class="row g-2 align-items-end mb-4">
+      <div class="col-auto">
+        <label class="form-label">Especie:</label>
+        <select name="especie" class="form-select" onchange="this.form.submit()">
+          {% for e in especies %}
+            <option value="{{ e.slug }}" {% if e.slug == slug_actual %}selected{% endif %}>{{ e.especie }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-auto">
+        <label class="form-label">Muestra de partida:</label>
+        <select name="muestra" class="form-select" onchange="this.form.submit()">
+          {% for m in muestras_ids %}
+            <option value="{{ m }}" {% if m == muestra_actual %}selected{% endif %}>{{ m }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-auto">
+        <label class="form-label">Condicion objetivo:</label>
+        <select name="condicion" class="form-select" onchange="this.form.submit()">
+          {% for c in categorias %}
+            <option value="{{ c }}" {% if c == resultado.condicion_objetivo %}selected{% endif %}>{{ c }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </form>
+
+    <p><b>Condicion real de la muestra:</b> {{ resultado.condicion_actual }}</p>
+    <p><b>Condicion objetivo generada:</b> {{ resultado.condicion_objetivo }}</p>
+
+    {% if resultado.clasificacion %}
+      {% if resultado.clasificacion == "plausible" %}
+      <div class="alert alert-success">
+      {% elif resultado.clasificacion == "frontera" %}
+      <div class="alert alert-warning">
+      {% else %}
+      <div class="alert alert-danger">
+      {% endif %}
+        <h5 class="mb-3">Resultado: <span class="text-uppercase">{{ resultado.clasificacion }}</span></h5>
+
+        <label class="form-label fw-bold mb-0">Percentil Isolation Forest: {{ resultado.percentil_isolation_forest }}%</label>
+        <div class="percentil-barra">
+          <div class="percentil-marcador" style="left: {{ resultado.percentil_isolation_forest }}%;"></div>
+        </div>
+        <div class="percentil-escala">
+          <span>0</span>
+          <span>90 (limite plausible)</span>
+          <span>97.5 (limite novedoso)</span>
+          <span>100</span>
+        </div>
+
+        <label class="form-label fw-bold mb-0 mt-3">Percentil Autoencoder: {{ resultado.percentil_autoencoder }}%</label>
+        <div class="percentil-barra">
+          <div class="percentil-marcador" style="left: {{ resultado.percentil_autoencoder }}%;"></div>
+        </div>
+        <div class="percentil-escala">
+          <span>0</span>
+          <span>90 (limite plausible)</span>
+          <span>97.5 (limite novedoso)</span>
+          <span>100</span>
+        </div>
+
+        <p class="small text-muted mt-3 mb-0">
+          El percentil compara el perfil generado contra las muestras reales de esta especie (validacion leave-one-out):
+          cuanto mas bajo, mas se parece a datos reales; cuanto mas alto, mas atipico resulta.
+          Se clasifica como <b>plausible</b> si ambos percentiles son menores a 90 (zona verde), como <b>novedoso</b>
+          si ambos superan 97.5 (zona roja), y como <b>frontera</b> en cualquier otro caso (zona amarilla).
+        </p>
+      </div>
+    {% else %}
+      <div class="alert alert-warning">
+        <b>Sin evaluacion cuantitativa disponible.</b> {{ resultado.nota_cualitativa }}
+      </div>
+    {% endif %}
+  </div>
+</body>
+</html>

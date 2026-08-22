@@ -1,0 +1,106 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Actualizador de modelo</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body {
+      background-image: url("{{ url_for('static', filename='fondo_secundario.png') }}");
+      background-size: cover;
+      background-position: top right;
+      background-repeat: no-repeat;
+      background-attachment: fixed;
+      min-height: 100vh;
+    }
+    .content-card {
+      background-color: rgba(255, 255, 255, 0.93);
+      border-radius: 1rem;
+      padding: 2rem;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    }
+    .navbar-glass {
+      background-color: rgba(13, 27, 33, 0.55) !important;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+  </style>
+</head>
+<body>
+  <nav class="navbar navbar-expand-md navbar-dark navbar-glass mb-4">
+    <div class="container-fluid">
+      <a class="navbar-brand" href="/">TFM VOCs</a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav">
+          <li class="nav-item"><a class="nav-link" href="/eda">EDA</a></li>
+          <li class="nav-item"><a class="nav-link" href="/predictor">Predictor</a></li>
+          <li class="nav-item"><a class="nav-link" href="/shap">SHAP</a></li>
+          <li class="nav-item"><a class="nav-link" href="/hipotesis">Hipotesis</a></li>
+          <li class="nav-item"><a class="nav-link" href="/latente">Espacio latente</a></li>
+          <li class="nav-item"><a class="nav-link active" href="/actualizar">Actualizar modelo</a></li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container content-card mb-4">
+    <h1 class="mb-4">Actualizador de modelo</h1>
+
+    <form method="get" class="row g-2 align-items-end mb-4">
+      <div class="col-auto">
+        <label class="form-label">Especie:</label>
+        <select name="especie" class="form-select" onchange="this.form.submit()">
+          {% for e in especies %}
+            <option value="{{ e.slug }}" {% if e.slug == slug_actual %}selected{% endif %}>{{ e.especie }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </form>
+
+    <p><b>Modelo actual:</b> {{ meta_actual.modelo }} — f1_macro_test: {{ meta_actual.f1_macro_test }}</p>
+
+    <div class="card mb-4">
+      <div class="card-body">
+        <h5 class="card-title">Subir datos nuevos</h5>
+        <p class="text-muted">CSV con columnas: sample_id, pubchem_cid, abundancia, physiological_state</p>
+        <form method="post" enctype="multipart/form-data" class="row g-2 align-items-end">
+          <input type="hidden" name="especie" value="{{ slug_actual }}">
+          <input type="hidden" name="accion" value="probar">
+          <div class="col-auto">
+            <input type="file" name="archivo" accept=".csv" class="form-control" required>
+          </div>
+          <div class="col-auto">
+            <button type="submit" class="btn btn-primary">Probar reentrenamiento</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    {% if resultado %}
+      <p>Muestras nuevas: {{ resultado.n_muestras_nuevas }} — Total tras incorporar: {{ resultado.n_muestras_total }}</p>
+      <p>F1 macro actual (CV): {{ resultado.f1_actual }}</p>
+      <p>F1 macro con datos nuevos (CV): {{ resultado.f1_nuevo }}</p>
+      {% if resultado.mejora %}
+        <div class="alert alert-success"><b>Mejora (o se mantiene) — se puede aplicar.</b></div>
+        {% if token %}
+        <form method="post">
+          <input type="hidden" name="especie" value="{{ slug_actual }}">
+          <input type="hidden" name="accion" value="confirmar">
+          <input type="hidden" name="token" value="{{ token }}">
+          <button type="submit" class="btn btn-success">Aprobar y reemplazar modelo</button>
+        </form>
+        {% else %}
+          <p><b>Modelo actualizado y guardado.</b></p>
+        {% endif %}
+      {% else %}
+        <div class="alert alert-danger"><b>Empeora — no se habilita el reemplazo.</b></div>
+      {% endif %}
+    {% endif %}
+  </div>
+</body>
+</html>
+
+
