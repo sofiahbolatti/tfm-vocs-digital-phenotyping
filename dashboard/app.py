@@ -3,7 +3,8 @@ import plotly.express as px
 import plotly.io as pio
 from data_access import (
     CLASSIFIER_SPECIES, CVAE_SPECIES, CATEGORIAS_CONDICION, load_eda_data, load_predictor_data,
-    compute_shap_summary, load_cvae_sample_matrix, generar_hipotesis, compute_latent_space,ACTUALIZABLES, entrenar_y_evaluar, guardar_token_csv, ruta_token_csv, aplicar_actualizacion, load_classifier
+    compute_shap_summary, load_cvae_sample_matrix, generar_hipotesis, compute_latent_space,ACTUALIZABLES, entrenar_y_evaluar, guardar_token_csv, ruta_token_csv, aplicar_actualizacion, load_classifier,
+    predecir_muestra_nueva
 )
 
 app = Flask(__name__)
@@ -47,9 +48,9 @@ def eda():
         grafico_html=grafico_html,
     )
 
-@app.route("/predictor")
+@app.route("/predictor", methods=["GET", "POST"])
 def predictor():
-    slug = request.args.get("especie", CLASSIFIER_SPECIES[0]["slug"])
+    slug = request.values.get("especie", CLASSIFIER_SPECIES[0]["slug"])
     datos = load_predictor_data(slug)
     matriz = datos["matriz"]
 
@@ -73,6 +74,15 @@ def predictor():
         clases = le.classes_ if le is not None else modelo.classes_
         probas = sorted(zip(clases, probas_raw), key=lambda x: -x[1])
 
+    resultado_nuevo = None
+    error_nuevo = None
+    if request.method == "POST" and "archivo" in request.files and request.files["archivo"].filename:
+        especie_ghosh = request.form.get("especie_ghosh")
+        try:
+            resultado_nuevo = predecir_muestra_nueva(slug, request.files["archivo"], especie_ghosh)
+        except Exception as e:
+            error_nuevo = str(e)
+
     return render_template(
         "predictor.html",
         especies=CLASSIFIER_SPECIES,
@@ -83,6 +93,8 @@ def predictor():
         real=real,
         probas=probas,
         meta=datos["artefactos"]["meta"],
+        resultado_nuevo=resultado_nuevo,
+        error_nuevo=error_nuevo,
     )
 
 @app.route("/shap")
