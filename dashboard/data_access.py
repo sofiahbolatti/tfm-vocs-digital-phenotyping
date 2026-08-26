@@ -21,9 +21,7 @@ DATASET_ORIGIN = {
 
 IMPUTA_CON_CERO = {"laupheimer2024"}
 
-# Info para el generador de hipotesis (CVAE): de donde sale el CSV de abundancia
-# y si hay que filtrar por especie dentro de ese CSV (caso Ghosh2022, que comparte
-# un solo archivo entre tomate y pimiento)
+# Info para el generador de hipotesis (CVAE): de donde sale el CSV  y si hay que filtrar por especie dentro de ese CSV (Ghosh2022)
 CVAE_DATASET_INFO = {
     "lazazzara2018": {"csv_slug": "lazazzara2018", "dataset_origin": "Lazazzara2018", "species_filter": None},
     "laupheimer2024": {"csv_slug": "laupheimer2024", "dataset_origin": "Laupheimer2024", "species_filter": None},
@@ -34,9 +32,8 @@ CVAE_DATASET_INFO = {
     "alinc2026": {"csv_slug": "alinc2026", "dataset_origin": "Alinc2026", "species_filter": None},
 }
 
-# Categorias de physiological_state en el mismo orden que uso cada notebook al armar
-# pd.get_dummies(..., drop_first=True) para condicionar el CVAE. La primera categoria
-# de cada lista es la referencia (no se codifica - "estar en 0 en todas las columnas").
+# Categorias de physiological_state en el mismo orden que uso cada notebook al armar pd.get_dummies para condicionar el CVAE. 
+# La primera categoria de cada lista es la referencia
 CATEGORIAS_CONDICION = {
     "lazazzara2018": ["control", "infected"],
     "laupheimer2024": ["control", "infected"],
@@ -49,12 +46,36 @@ CATEGORIAS_CONDICION = {
 
 
 def get_db_connection():
+"""
+Abre una conexion a la base SQLite del proyecto.
+Returns:
+sqlite3.Connection
+    Conexion abierta a db/tfm_vocs.db, con row_factory configurado para
+    poder acceder a las columnas por nombre (ej. row['sample_id']).
+"""
     con = sqlite3.connect(DB_PATH)
     con.row_factory = sqlite3.Row
     return con
 
 
 def load_classifier(slug):
+"""
+Carga desde el disco los artefactos del clasificador ya entrenado de una especie
+
+Parameters:
+slug : str
+    Identificador de la especie (Ej. "lazazzara2018"), usado como nombre de subcarpeta dentro de models/
+
+Returns:
+dict
+    Con las claves "model" (clasificador), "feature_columns" (columnas
+    que espera como input), "meta" (metadatos del entrenamiento) y "label_encoder" (o none)
+
+Example
+-------
+>>> load_classifier("lazazzara2018")["meta"]["modelo"]
+'Arbol de decision'
+"""
     d = MODELS_DIR / slug
     return {
         "model": joblib.load(d / "classifier.joblib"),
@@ -65,6 +86,19 @@ def load_classifier(slug):
 
 
 def _sampling(args):
+"""
+Implementa la reparametrizacion del CVAE
+
+Parameters:
+args : tuple[tf.Tensor, tf.Tensor]
+    Tupla (z_mean, z_log_var) que produce el encoder
+
+Se define como funcion de modulo,  porque Keras necesita serializarla y volver a cargarla via custom_objects
+
+Returns:
+tf.Tensor
+    Un punto z del espacio latente: z_mean + exp(0.5*z_log_var) * eps, con eps ruido gaussiano.
+"""
     import tensorflow as tf
     z_mean, z_log_var = args
     eps = tf.random.normal(shape=tf.shape(z_mean))
@@ -72,6 +106,19 @@ def _sampling(args):
 
 
 def load_cvae_artifacts(slug):
+"""
+Carga desde disco todos los artefactos del CVAE de una especie
+
+Parameters:
+slug : str
+    Identificador de la especie del CVAE (ej. "ghosh2022_tomate").
+
+Returns:
+dict
+    Con "encoder", "decoder", "scaler", "compound_ids" y "meta"; si la especie tiene detector de anomalias cuantitativo (ver
+    CVAE_SPECIES), incluye ademas "isolation_forest", "autoencoder", "scores_loo" y "errores_loo_ae" (referencia de la calibracion
+    Leave-One-Out).
+"""
     from tensorflow import keras
     d = MODELS_DIR / slug
     custom = {"sampling": _sampling}
@@ -91,6 +138,21 @@ def load_cvae_artifacts(slug):
 
 
 def load_predictor_data(slug):
+"""
+Arma la matriz de features que espera el clasificador de una especie
+
+Reproduce el preprocesamiento de la Etapa 2: pivotea las abundancias, imputa con cero solo si la especie lo requiere, 
+aplica z-score, y completa las columnas que el modelo espera pero no estan en los datos (ej. la columna one-hot de especie deGhosh2022)
+
+Parameters:
+slug : str
+    Identificador de la especie
+
+Returns:
+dict
+    Con "artefactos" (el clasificador ya cargado) y "matriz" (DataFrame con una fila por muestra, columnas de compuestos estandarizadas, y la
+    columna physiological_state real).
+"""
     dataset_origin = DATASET_ORIGIN[slug]
     con = get_db_connection()
     muestras = pd.read_sql(
@@ -130,6 +192,18 @@ def load_predictor_data(slug):
 
 
 def load_cvae_sample_matrix(slug):
+"""
+Devuelve la matriz de abundancias y los estados fisiologicos de una especie
+
+Parameters:
+slug : str
+    Identificador de la especie del CVAE
+
+Returns:
+tuple[pandas.DataFrame, pandas.Series]
+    La matriz de abundancias sin estandarizar, y la serie de estados fisiologicos indexada por sample_id. 
+    Filtra por especie cuando corresponde (Ghosh2022)
+"""
     info = CVAE_DATASET_INFO[slug]
     con = get_db_connection()
     query = "SELECT sample_id, physiological_state FROM muestras WHERE dataset_origin = ?"
@@ -147,13 +221,40 @@ def load_cvae_sample_matrix(slug):
 
 
 def percentil_vs_referencia(score, referencia):
+"""
+Calcula en que percentil de una distribucion de referencia cae un score nuevo
+
+Parameters:
+score : float
+    Score a ubicar (de IF o del error de reconstruccion)
+referencia : array-like
+    Scores de las muestras reales, calibrados por Loo
+
+Returns:
+float
+    Percentil (0-100). Por debajo de 90 en ambos detectores se considera
+    "plausible"; por encima de 97.5 en ambos, "novedoso" y el resto, "frontera".
+"""
     return float(np.mean(np.asarray(referencia) <= score) * 100)
 
 
 def construir_vector_condicion(slug, estado):
-    """Arma el vector de condicion tal como lo espera el encoder/decoder de esta especie,
-    replicando pd.get_dummies(categorias, drop_first=True): todo en 0 si es la categoria
-    de referencia (la primera de la lista), un 1 en la posicion correspondiente si no."""
+"""
+Arma el vector de condicion  como lo espera el encoder/decoder del CVAE
+
+Replica pd.get_dummies(categorias, drop_first=True): el vector queda en 0 en todas las posiciones si el estado es la categoria de referencia (la
+primera de la lista en CATEGORIAS_CONDICION), y en 1 en la posicion correspondiente si no
+
+Parameters:
+slug : str
+    Identificador de la especie del CVAE
+estado : str
+    Estado fisiologico a codificar
+
+Returns:
+numpy.ndarray
+    Vector de condicion de forma (1, n_categorias - 1), tipo floatt
+"""
     categorias = CATEGORIAS_CONDICION[slug]
     columnas = categorias[1:]
     vector = [1.0 if estado == c else 0.0 for c in columnas]
@@ -161,6 +262,25 @@ def construir_vector_condicion(slug, estado):
 
 
 def generar_hipotesis(slug, sample_id, condicion_objetivo):
+"""
+Genera un perfil quimico imaginado para una muestra si pasara a otro estado
+
+Codifica la muestra real con su condicion actual para obtener su punto en el espacio latente, y decodifica ese mismo punto con la condicion objetivo
+para obtener el perfil sintetico. Si la especie tiene detector cuantitativo, lo clasifica como plausible/frontera/novedoso
+
+Parameters:
+slug : str
+    Identificador de la especie del CVAE
+sample_id : str
+    Id de la muestra real de partida
+condicion_objetivo : str
+    Estado fisiologico hacia el que se quiere explorar 
+
+Returns:
+dict
+    Con "meta", "condicion_actual", "condicion_objetivo"; si hay detector cuantitativo, "clasificacion",
+    "percentil_isolation_forest" y "percentil_autoencoder"; si no,  "nota_cualitativa".
+"""
     art = load_cvae_artifacts(slug)
     matriz, estados = load_cvae_sample_matrix(slug)
 
@@ -206,6 +326,18 @@ def generar_hipotesis(slug, sample_id, condicion_objetivo):
     return resultado
 
 def compute_latent_space(slug):
+"""
+Codifica todas las muestras de una especie en el espacio latente del CVAE
+
+Parameters:
+slug : str
+    Identificador de la especie del CVAE
+
+Returns:
+pandas.DataFrame
+    Con columnas sample_id, z1, z2 (coordenadas  de 2 dimensiones) y physiological_state (estado real), para graficar el
+    modulo "Espacio latente" del dashboard
+"""
     art = load_cvae_artifacts(slug)
     matriz, estados = load_cvae_sample_matrix(slug)
 
@@ -240,6 +372,20 @@ ACTUALIZABLES = [s for s in CLASSIFIER_SPECIES if s["slug"] != "ghosh2022"]
 
 
 def load_raw_feature_matrix(slug):
+"""
+Devuelve la matriz de abundancias sin estandarizar de una especie
+
+Igual que load_predictor_data pero sin z-score, porque entrenar_y_evaluar y predecir_muestra_nueva necesitan calcular media y desvio ellas mismas sobre
+distintos subconjuntos de datos
+
+Parameters:
+slug : str
+    Identificador de la especi
+
+Returns:
+tuple[pandas.DataFrame, pandas.DataFrame]
+    La matriz de abundancias pivotada, y los metadatos de cada muestra indexados por sample_id
+"""
     dataset_origin = DATASET_ORIGIN[slug]
     con = get_db_connection()
     muestras = pd.read_sql(
@@ -259,6 +405,23 @@ def load_raw_feature_matrix(slug):
 
 
 def entrenar_y_evaluar(slug, csv_nuevo_path=None):
+"""
+Entrena un modelo candidato y lo compara contra el modelo en produccion
+
+Primer paso ("probar") del flujo de dos pasos del modulo Actualizador de modelo. Combina los datos existentes con un CSV nuevo si se pasa uno, y
+evalua ambos modelos (actual y candidato) con el mismo esquema de alidacion cruzada. No sobrescribe ningun archivo.
+
+Parameters:
+slug : str
+    Identificador de la especie a actualizar
+csv_nuevo_path : str o None
+    Ruta a un CSV con muestras nuevas. None si solo se quiere reevaluar el
+    modelo actual
+
+Returns:
+dict
+    Con "n_muestras_nuevas", "n_muestras_total", "f1_actual", "f1_nuevo", "mejora" (bool), "modelo_entrenado" y "feature_columns".
+"""
     matriz_actual, meta_actual = load_raw_feature_matrix(slug)
     artefactos = load_classifier(slug)
     columnas = artefactos["feature_columns"]
@@ -305,6 +468,17 @@ def entrenar_y_evaluar(slug, csv_nuevo_path=None):
 
 
 def guardar_token_csv(file_storage):
+"""
+Guarda un CSV subido por el usuario en una carpeta temporal, con un token unico
+
+Parameters:
+file_storage : werkzeug.datastructures.FileStorage
+    Archivo recibido en el request de Flask
+
+Returns:
+str
+    Token que identifica el archivo guardado, para  recuperarlo despues con ruta_token_csv sin que el usuario lo vuelva  a subir
+"""
     token = uuid.uuid4().hex
     destino = UPLOAD_TMP_DIR / f"{token}.csv"
     file_storage.save(destino)
@@ -312,10 +486,37 @@ def guardar_token_csv(file_storage):
 
 
 def ruta_token_csv(token):
+"""
+Devuelve la ruta al CSV temporal correspondiente a un token
+
+Parameters:
+token : str
+    Token devuelto por guardar_token_csv
+
+Returns:
+pathlib.Path
+    Ruta al archivo dashboard/_uploads_tmp/<token>.csv.
+"""
     return UPLOAD_TMP_DIR / f"{token}.csv"
 
 
 def aplicar_actualizacion(slug, csv_nuevo_path):
+"""
+Reentrena y reemplaza el modelo guardado, solo si el candidato mejora
+
+Segundo paso ("confirmar") del flujo de actualizacion de modelo: repite la comparacion de entrenar_y_evaluar y, unicamente si el F1 macro  es igual o mejor, 
+sobrescribe classifier.joblib y sus metadatos. Si no mejora, no toca nada
+
+Parameters:
+slug : str
+    Identificador de la especie a actualizar
+csv_nuevo_path : str
+    Ruta al CSV temporal con las muestras nuevas confirmadas
+
+Returns:
+dict
+    El mismo resultado que entrenar_y_evaluar, con el modelo ya guardadoen disco si "mejora" es True.
+"""
     resultado = entrenar_y_evaluar(slug, csv_nuevo_path)
     if not resultado["mejora"]:
         return resultado
@@ -329,17 +530,50 @@ def aplicar_actualizacion(slug, csv_nuevo_path):
     return resultado
 
 def _cv_f1(modelo, X, y):
+"""
+Calcula el F1 macro promedio de un modelo por validacion cruzada estratificada
+
+Parameters:
+modelo : sklearn estimator
+    Modelo (sin entrenar) a evaluar; se clona antes de cada corrida
+X : numpy.ndarray
+    Matriz de features
+y : array-like
+    Etiquetas (estado)
+
+
+El numero de particiones se ajusta automaticamente (entre 2 y 5) segun la clase con menos muestras, para que StratifiedKFold no falle en datasets
+chicos con clases muy desbalanceadas
+
+Return:
+float
+    F1 macro promedio sobre las particiones de validacion cruzada
+"""
     y = np.asarray(y, dtype=object)
     n_splits = max(2, min(5, pd.Series(y).value_counts().min()))
     cv = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=42)
     return cross_val_score(clone(modelo), X, y, cv=cv, scoring="f1_macro").mean()
 
 def predecir_muestra_nueva(slug, archivo_csv, especie_ghosh=None):
-    """Predice el estado fisiologico de una o mas muestras NUEVAS (no guardadas en la base),
-    subidas como CSV con columnas sample_id, pubchem_cid, abundancia.
-    El z-score se calcula con la media y el desvio de las muestras YA existentes de la especie
-    (la misma logica que "ajustar con el set de entrenamiento, transformar los datos nuevos"),
-    nunca con la muestra nueva sola - un z-score de un solo dato no tiene sentido."""
+"""
+Predice el estado fisiologico de una o mas muestras nuevas, no guardadas en la base
+
+El z-score se calcula con la media y el desvio de las muestras ya existentes de la especie (ajustar con el set de entrenamiento, transformar
+los datos nuevos), nunca con la muestra nueva sola, porque un z-score de un solo dato no tiene sentido.
+
+Parameters:
+slug : str
+    Identificador de la especie
+archivo_csv : str o file-like
+    CSV subido con columnas sample_id, pubchem_cid, abundancia
+especie_ghosh : str o None
+    "Solanum lycopersicum" o "Capsicum annuum", solo si slug es  "ghosh2022" (necesita saber a que subespecie pertenece)
+
+Returns:
+list[dict]
+    Una entrada por muestra del CSV, con "sample_id", "prediccion" y "probas" (lista de tuplas clase-probabilidad ordenada de mayor a
+    menor, o None si el modelo no expone predict_proba)
+"""
     matriz_ref, _ = load_raw_feature_matrix(slug)
     if slug in IMPUTA_CON_CERO:
         matriz_ref = matriz_ref.fillna(0)
@@ -408,9 +642,21 @@ CVAE_SPECIES = [
 import re
 
 def limpiar_nombre_compuesto(nombre):
-    """Limpia anotaciones de laboratorio en el nombre del compuesto para mostrarlo en
-    pantalla (ej. "Hexanal (vitis leave_berry)_24" -> "Hexanal"). Solo afecta el texto
-    que se muestra, no toca pubchem_cid ni ningun otro dato usado por los modelos."""
+"""
+Limpia anotaciones de laboratorio en el nombre de un compuesto
+
+Parameters:
+nombre : str
+    Nombre original del compuesto, como aparece en la base de datos (ej. "Hexanal (vitis leave_berry)_24").
+
+Returns:
+str
+    Nombre limpio, sin anotaciones.Solo afecta el texto mostrado
+
+Example:
+>>> limpiar_nombre_compuesto("Hexanal (vitis leave_berry)_24")
+'Hexanal'
+"""
     limpio = re.sub(r'\s*\([^)]*\)', '', nombre)
     limpio = re.sub(r'\?.*$', '', limpio)
     limpio = re.sub(r'[\s_]*(Std)?[\s_]*\d+$', '', limpio, flags=re.IGNORECASE)
@@ -418,6 +664,18 @@ def limpiar_nombre_compuesto(nombre):
 
 
 def load_eda_data(slug):
+"""
+Arma los datos para el modulo de Exploracion de datos (EDA) de una especie
+
+Parameters:
+slug : str
+    Identificador de la especie
+
+Returns:
+dict
+    Con "n_muestras" (int), "resumen_clases" (DataFrame con la cantidad de muestras por estado fisiologico) y "abundancias" (DataFrame listo para graficar el
+    boxplot de los 5 compuestos con mayor variacion)
+"""
     dataset_origin = DATASET_ORIGIN[slug]
     con = get_db_connection()
     muestras = pd.read_sql(
@@ -446,6 +704,20 @@ def load_eda_data(slug):
     }
 
 def compute_shap_summary(slug, top_n=10):
+"""
+Calcula los compuestos mas importantes para el clasificador de una especie, segun SHAP
+
+Parameters:
+slug : str
+    Identificador de la especie
+top_n : int, opcional
+    Cantidad de compuestos a devolver 
+
+Returns:
+pandas.Series
+    Importancia SHAP promedio (valor absoluto, promediada entre clases si  hay mas de dos estados posibles), 
+    indexada por el nombre legible del compuesto en vez del pubchem_cid
+"""
     datos = load_predictor_data(slug)
     matriz = datos["matriz"]
     X = matriz.drop(columns=["physiological_state"])
