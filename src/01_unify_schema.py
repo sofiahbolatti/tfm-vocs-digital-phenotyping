@@ -1,25 +1,21 @@
 ﻿"""
-Unificacion de esquema (version 2 - basada en el codigo real de los loaders)
-=============================================================================
-Este script parte de que la tabla `muestras` YA EXISTE con las filas de
-Lazazzara2018 y Laupheimer2024 (comparten esquema via to_sql(if_exists="append")).
+Unificacion de esquema
+
+Este script parte de que la tabla `muestras` YA EXISTE con las filas de Lazazzara y Laupheimer (comparten esquema).
 
 Las 4 tablas restantes tienen su propio esquema porque incluyen columnas que
-`muestras` no tiene:
+"muestra" no tiene:
     - muestras_alinc2026   -> fungal_inoculant, herbivore_species, treatment_group, zenodo_doi
-    - muestras_ayelo2026   -> cultivar_code, cultivar_resistance, herbivore_population,
-                               treatment_group, voc_total_reported
-    - muestras_moreira2024 -> herbivore_species, treatment_group, height_cm,
-                               voc_total_reported, dryad_doi, raw_id
+    - muestras_ayelo2026   -> cultivar_code, cultivar_resistance, herbivore_population, treatment_group, voc_total_reported
+    - muestras_moreira2024 -> herbivore_species, treatment_group, height_cm,voc_total_reported, dryad_doi, raw_id
     - muestras_ghosh2022   -> virus, herbivore_species, treatment_group
 
 Este script:
-  1. Agrega a `muestras` dos columnas nuevas: eje_biologico, metadata_extra (JSON)
+  1. Agrega a "muestras" dos columnas nuevas: eje_biologico, metadata_extra 
   2. Backfillea eje_biologico='estandar' en las filas existentes (Lazazzara/Laupheimer)
-  3. Inserta las filas de las 4 tablas outlier en `muestras`, mapeando lo que
-     coincide en nombre/tipo y empaquetando el resto en metadata_extra
+  3. Inserta las filas de las 4 tablas outlier en `muestras`, mapeando lo que coincide en nombre/tipo y empaquetando el resto en metadata_extra
 
-No borra ninguna tabla original (muestras_alinc2026, etc. quedan de respaldo).
+No borra ninguna tabla original
 
 Uso:
     python src/01_unify_schema_v2.py db/tfm_vocs.db
@@ -46,11 +42,32 @@ TABLAS_OUTLIER = {
 
 
 def columnas_de_tabla(cur, tabla):
+    """
+    Devuelve los nombres de columna de una tabla SQLite
+    Parameters:
+    cur : sqlite3.Cursor
+    Cursor abierto sobre la base de datos
+    tabla : str
+    Nombre de la tabla a inspeccionar
+    Returns:
+    list[str]
+    Nombres de columna, en el orden que devuelve PRAGMA table_info
+    """
     cur.execute(f"PRAGMA table_info({tabla});")
     return [row[1] for row in cur.fetchall()]
 
 
 def asegurar_columnas_nuevas(cur):
+    """
+    Agrega a la tabla muestras las columnas eje_biologico y metadata_extra, si todavia no existen no hace nada si las columnas 
+    ya fueron agregadas en una corrida anterior del script 
+    Parameters:
+    cur : sqlite3.Cursor
+    Cursor abierto sobre la base de datos
+    Returns:
+    None
+    Modifica la tabla muestras en el lugar  e imprime un mensaje por cada columna agregada
+    """
     cols_actuales = columnas_de_tabla(cur, "muestras")
     if "eje_biologico" not in cols_actuales:
         cur.execute("ALTER TABLE muestras ADD COLUMN eje_biologico TEXT;")
@@ -61,6 +78,16 @@ def asegurar_columnas_nuevas(cur):
 
 
 def backfill_estandar(cur):
+    """
+    Completa eje_biologico='estandar' en las filas de muestras que todavia no tienen valor
+    Corresponde a las muestras de Lazazzara  y Laupheimer, cargadas antes de que existiera la columna eje_biologico
+    Parameters:
+    cur : sqlite3.Cursor
+    Cursor abierto sobre la base de datos
+    Returns:
+    None
+    Actualiza muestras en el lugar e imprime la cantidad de filas afectadas
+    """
     cur.execute(
         "UPDATE muestras SET eje_biologico = 'estandar' "
         "WHERE eje_biologico IS NULL;"
@@ -69,6 +96,24 @@ def backfill_estandar(cur):
 
 
 def fusionar_tabla_outlier(cur, tabla_origen, eje_biologico, fecha):
+    """
+    Inserta en "muestras" las filas de una tabla outlie, separando las columnas que coinciden con el esquema estandar de las que son especificas de esa tabla. Las 
+    columnas que no estan en COLUMNAS_MUESTRAS_ACTUALES se empaquetan como JSON en metadata_extra
+    Parameters:
+    cur : sqlite3.Cursor
+    Cursor abierto sobre la base de datos
+    tabla_origen : str
+    Nombre de la tabla outlier a fusionar 
+    eje_biologico : str
+    Etiqueta del eje biologico a asignar a estas filas
+    fecha : str
+    Fecha de la migracion en formato ISO (para trazabilida)
+    Precondition:
+    La tabla `tabla_origen` debe existir y compartir la columna "sample_id" con `muestras`; las filas sin sample_id se descartan
+    Returns:
+    int
+    Cantidad de filas efectivamente insertadas en `muestras`
+    """
     cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?;", (tabla_origen,))
     if not cur.fetchone():
         print(f"[AVISO] Tabla '{tabla_origen}' no existe. Se omite.")
@@ -114,6 +159,17 @@ def fusionar_tabla_outlier(cur, tabla_origen, eje_biologico, fecha):
 
 
 def migrar(db_path: str):
+    """
+    Agrega las columnas nuevas, backfillea las filas existentes y fusiona las 4 tablas outlier en muestras
+    Parameters:
+    db_path : str
+    Ruta al archivo SQLite
+    Precondition:
+    La tabla `muestras` ya debe existir, con las filas de Lazazzara  y Laupheimer cargadas
+    Returns:
+    None
+    No devuelve nada; imprime un resumen final y No borra ninguna tabla original
+    """
     conn = sqlite3.connect(db_path)
     cur = conn.cursor()
     fecha = datetime.now(timezone.utc).isoformat()
