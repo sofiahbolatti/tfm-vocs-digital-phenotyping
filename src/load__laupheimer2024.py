@@ -1,20 +1,20 @@
 """
-Loader: Laupheimer et al. 2024 (Physiologia Plantarum, DOI 10.1111/ppl.14646)
+Loader: Laupheimer et al. 2024 (DOI 10.1111/ppl.14646)
 Cebada x Blumeria hordei - VOCs por TD-GC/MS
 
 Fuente original: dataset publico en figshare (DOI 27320754)
 
-Estructura del CSV (archivo MetaboVOC.csv):
-- Fila 1: numeros de muestra (1, 2, 3... 32)
-- Fila 2: etiquetas de muestra (ej: "MLO WT 1", "mlo5 Bh 3")
+Estructura del CSV:
+- Fila 1: numeros de muestra 
+- Fila 2: etiquetas de muestra
 - Filas 3-27: un VOC por fila, abundancia por muestra
 - Separador: punto y coma (;)
-- Valores faltantes: celda vacia o espacio (" ")
+- Valores faltantes: celda vacia o espacio 
 
-Mapeo biologico (confirmado contra el paper original):
+Mapeo biologico:
 - Genotipos: WT (wild type, susceptible), mlo5 (mutante resistente por perdida de funcion del gen MLO)
 - "Bh" en la etiqueta = infectado con Blumeria hordei; sin "Bh" = control
-- Numero al final de la etiqueta = timepoint en DAI (days after inoculation: 1, 3 o 5
+- Numero al final de la etiqueta = timepoint en DAI (days after inoculation)
 - Unidad de abundancia: concentracion en ng por gramo de peso fresco (ng/gFW)
 """
 
@@ -23,9 +23,8 @@ from datetime import date
 from pathlib import Path
 import pandas as pd
 
-#----------------------------------------------------------------------------------
+
 # Configuración
-#----------------------------------------------------------------------------------
 
 CSV_PATH = "data/raw/Laupheimer/rawdata_laupheimer.csv"
 DATASET_ORIGIN = "Laupheimer2024"
@@ -34,8 +33,7 @@ ANALYTICAL_TECHNIQUE = "TD-GC/MS"
 TISSUE = "leaves"
 SPECIES = "Hordeum vulgare"
 
-# Mapeo compuesto identificado -> PubChem CID (buscado y verificado en PubChem
-# por nombre/CAS). Los 25 VOCs de este dataset estan identificados .
+# Mapeo compuesto identificado -> PubChem CID (Los 25 VOCs de este dataset estan identificados 
 
 PUBCHEM_CID_BY_NAME = {
     "(Z)-3-Hexenol": 5281167,
@@ -65,11 +63,18 @@ PUBCHEM_CID_BY_NAME = {
     "Methyl salicylate": 4133,
 }
 
-#---------------------------------------------------------------------------
 # Paso 1: Leer el csv
-#----------------------------------------------------------------------------
 
 def read_csv_raw(path):
+    """
+    Lee el CSV crudo  y separa las filas de datos de las de encabezado
+    Parameters:
+    path : str
+    Ruta al CSV
+    Returns:
+    tuple[pandas.DataFrame, list]
+    voc_data: un VOC por fila, con columna voc_name y una columna por muestra ; sample_labels: las etiquetas de muestra de la fila 2 del CSV, en el mismo orden que las columnas de voc_data
+    """
     df = pd.read_csv(path, sep=";", header=None)
     sample_numbers = df.iloc[0, 1:].tolist()
     sample_labels = df.iloc[1, 1:].tolist()
@@ -78,11 +83,19 @@ def read_csv_raw(path):
     voc_data = voc_data.reset_index(drop=True)
     return voc_data, sample_labels
 
-#---------------------------------------------------------------------------
+
 # Paso 2: construir tabla de muestras
-#----------------------------------------------------------------------------
 
 def parse_sample_label(label):
+    """
+    Parsea una etiqueta de muestra a sus componentes biologicos
+    Parameters:
+    label : str
+    Etiqueta de muestra tal como aparece en el CSV 
+    Returns:
+    tuple[str, str, int]
+    genotipo, physiological_state  y timepoint 
+    """
     genotipo = "mlo5" if label.startswith("mlo") else "WT"
     infectado = "Bh" in label
     physiological_state = "infected" if infectado else "control"
@@ -91,6 +104,17 @@ def parse_sample_label(label):
 
 
 def build_muestras(sample_labels, sample_numbers):
+    """
+    Arma la tabla de metadatos de muestras, parseando cada etiqueta con parse_sample_label
+    Parameters:
+    sample_labels : list[str]
+    Etiquetas de muestra 
+    sample_numbers : list[int]
+    Numeros de muestra en el mismo orden que sample_labels 
+    Returns:
+    pandas.DataFrame
+    Una fila por muestra, con sample_id, genotype, physiological_state, timepoint y metadata, mas raw_label (para trazabilidad)
+    """
     rows = []
     for num, label in zip(sample_numbers, sample_labels):
         genotipo, physiological_state, timepoint = parse_sample_label(label)
@@ -120,11 +144,18 @@ def build_muestras(sample_labels, sample_numbers):
         })
     return pd.DataFrame(rows)
 
-#---------------------------------------------------------------------------
 # Paso 3: Construir catálogo de compuestos
-#----------------------------------------------------------------------------
 
 def build_compuestos(voc_data):
+    """
+    Arma el catalogo de compuestos a partir de los nombres de VOC del CSV
+    Parameters:
+    voc_data : pandas.DataFrame
+    Salida de read_csv_raw
+    Returns:
+    pandas.DataFrame
+    Una fila por compuesto, con compuesto_id, name_original, cas (None) y pubchem_cid
+    """
     rows = []
     for i, name in enumerate(voc_data["voc_name"].tolist()):
         rows.append({
@@ -137,11 +168,20 @@ def build_compuestos(voc_data):
         })
     return pd.DataFrame(rows)
 
-#---------------------------------------------------------------------------
 # Paso 4: contruir matriz de abundancias
-#----------------------------------------------------------------------------
 
 def build_abundancias(voc_data, muestras):
+    """
+    Arma la matriz de abundancias en formato largo, mapeando cada columna de voc_data a su sample_id por posicion
+    Parameters:
+    voc_data : pandas.DataFrame
+    Salida de read_csv_raw
+    muestras : pandas.DataFrame
+    Salida de build_muestras
+    Returns:
+    pandas.DataFrame
+    Columnas sample_id, compuesto_id, abundancia (None si la celda estaba vacia) y unidad
+    """
     col_to_sample_id = dict(zip(
         muestras["raw_label"].index,
         muestras["sample_id"]
@@ -168,11 +208,24 @@ def build_abundancias(voc_data, muestras):
     return pd.DataFrame(long_rows)
 
 
-#---------------------------------------------------------------------------
+
 # Paso 5: Guardar en SQLite + Parquet
-#----------------------------------------------------------------------------
 
 def save_to_sqlite(muestras, compuestos, db_path):
+    """
+    Guarda las tablas de muestras y compuestos en la base SQLite
+    Laupeimer comparte esquema con Lazazzara y se guarda directo en la tabla `muestras` comun (append)
+    Parameters:
+    muestras : pandas.DataFrame
+    Salida de build_muestras
+    compuestos : pandas.DataFrame
+    Salida de build_compuestos
+    db_path : str
+    Ruta al archivo SQLite
+    Returns:
+    None
+    Descarta la columna raw_label antes de guardar muestras; crea el archivo si no existe
+    """
     Path(db_path).parent.mkdir(parents=True, exist_ok=True)
     con = sqlite3.connect(db_path)
     muestras.drop(columns=["raw_label"]).to_sql(
@@ -184,14 +237,31 @@ def save_to_sqlite(muestras, compuestos, db_path):
     con.close()
 
 def save_to_parquet(abundancias, parquet_path):
+    """
+    Guarda la matriz de abundancias en formato parquet
+    Parameters:
+    abundancias : pandas.DataFrame
+    Salida de build_abundancias
+    parquet_path : str
+    Ruta de destino del archivo parquet
+    Returns:
+    None
+    Crea la carpeta de destino si no existe
+    """
     Path(parquet_path).parent.mkdir(parents=True, exist_ok=True)
     abundancias.to_parquet(parquet_path, index=False)
 
-#---------------------------------------------------------------------------
+
 # Paso 6: Main
-#----------------------------------------------------------------------------
+
 
 def main():
+    """
+    Lee el CSV, arma las tres tablas y las persiste en SQLite (muestras) y parquet
+    Returns:
+    None
+    imprime un resumen de cuantas muestras, compuestos y filas de abundancia se cargaron
+    """
     DB_PATH = "db/tfm_vocs.db"
     PARQUET_PATH = "db/data/processed/abundancias_laupheimer2024.parquet"
 
