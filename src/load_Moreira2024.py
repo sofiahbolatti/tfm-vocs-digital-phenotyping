@@ -1,11 +1,10 @@
 """
 Loader: Moreira et al. 2024 (DOI 10.1111/1365-2745.14242)
-Colza (Brassica rapa) x Sclerotinia sclerotiorum / Xanthomonas campestris pv.campestris / Mamestra brassicae / Brevicoryne brassicae vs control - VOCs
-florales por bomba de aire + GC-MS
+Colza (Brassica rapa) x Sclerotinia sclerotiorum / Xanthomonas campestris pv.campestris / Mamestra brassicae / Brevicoryne brassicae vs control - VOCsflorales por bomba de aire + GC-MS
 
-Estructura del CSV (separador ";"):
+Estructura del CSV:
 - Columnas: ID, Genotype, Treatment, height, [15 VOCs], total
-- 60 filas = 60 muestras individuales (1 por planta)
+- 60 filas = 60 muestras individuales
 - Unidad de abundancia: nanogramos por hora (ng/h)
 - Sin valores faltantes en los VOCs 
 
@@ -16,20 +15,17 @@ Diseno biologico (5 clases):
 - mamestra     = oruga Mamestra brassicae, herbivoria (n=12)
 - brevicoryne  = pulgon Brevicoryne brassicae, herbivoria (n=11)
 
-El dataset mezcla patogenos y herbivoros en un solo eje de tratamiento. Se separan en dos columnas (microorganism / herbivore_species)
-para no perder esa distincion biologica, y se guarda en una tabla propia hasta definir el esquema unificado en la etapa de
-limpieza/normalizacion.
+El dataset mezcla patogenos y herbivoros en un solo eje de tratamiento. Se separan en dos columnas (microorganism / herbivore_species) para no perder esa distincion biologica.
 """
 
 import sqlite3
 from datetime import date
 from pathlib import Path
-
 import pandas as pd
 
-# ---------------------------------------------------------------------------
+
 # Configuracion
-# ---------------------------------------------------------------------------
+
 
 CSV_PATH = "data/raw/Moreira/rawdata_moreira.csv"
 
@@ -75,11 +71,20 @@ PUBCHEM_CID_BY_NAME = {
 VOC_COLUMNS = list(PUBCHEM_CID_BY_NAME.keys())
 
 
-# ---------------------------------------------------------------------------
 # Paso 1: leer el csv
-# ---------------------------------------------------------------------------
 
 def read_csv_raw(path: str) -> pd.DataFrame:
+    """
+    Lee el CSV crudo y valida que esten todas las columnas de VOC esperadas
+    Parameters:
+    path : str
+    Ruta al CSV 
+    Precondition:
+    El CSV debe tener las 15 columnas VOC listadas en PUBCHEM_CID_BY_NAME; si falta alguna, ValueError
+    Returns:
+    pandas.DataFrame
+    Las 60 filas del CSV
+    """
     df = pd.read_csv(path, sep=";")
     missing = [c for c in VOC_COLUMNS if c not in df.columns]
     if missing:
@@ -87,11 +92,19 @@ def read_csv_raw(path: str) -> pd.DataFrame:
     return df
 
 
-# ---------------------------------------------------------------------------
 # Paso 2: construir tabla de muestras
-# ---------------------------------------------------------------------------
 
 def build_muestras(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Arma la tabla de metadatos de muestras, separando el tratamiento en microorganismo/herbivoro/estado fisiologico via TREATMENT_MAP
+    El dataset mezcla patogenos y herbivoros en una sola columna Treatment; esta funcion los separa en dos columnas (microorganism, herbivore_species) para no perder esa distincion biologica
+    Parameters:
+    df : pandas.DataFrame
+    Salida de read_csv_raw
+    Returns:
+    pandas.DataFrame
+    Una fila por muestra (60 en total), con sample_id, especie, tratamiento separado en microorganismo/herbivoro/estado, y metadata fija del dataset, mas raw_id (por trazabilidad)
+    """
     rows = []
     for _, r in df.iterrows():
         treatment = r["Treatment"]
@@ -126,11 +139,15 @@ def build_muestras(df: pd.DataFrame) -> pd.DataFrame:
 
 
   
-# ---------------------------------------------------------------------------
 # Paso 3: construir catalogo de compuestos
-# ------------------------------------------------------------------------------
 
 def build_compuestos() -> pd.DataFrame:
+    """
+    Arma el catalogo de compuestos a partir de PUBCHEM_CID_BY_NAME
+    Returns:
+    pandas.DataFrame
+    Una fila por compuesto (15 en totall), con compuesto_id, name_original y pubchem_cid
+    """
     rows = []
     for i, name in enumerate(VOC_COLUMNS):
         rows.append({
@@ -144,11 +161,20 @@ def build_compuestos() -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-# ------------------------------------------------------------------------------
 # Paso 4: construir matriz de abundancias 
-# ---------------------------------------------------------------------------
 
 def build_abundancias(df: pd.DataFrame, muestras: pd.DataFrame) -> pd.DataFrame:
+    """
+    Arma la matriz de abundancias en formato largo, mapeando cada fila del CSV a su sample_id via el ID original
+    Parameters:
+    df : pandas.DataFrame
+    Salida de read_csv_raw
+    muestras : pandas.DataFrame
+    Salida de build_muestras
+    Returns:
+    pandas.DataFrame
+    Columnas sample_id, compuesto_id, abundancia y unidad
+    """
     id_to_sample_id = dict(zip(muestras["raw_id"], muestras["sample_id"]))
     compound_to_id = {
         name: f"{DATASET_ORIGIN.lower()}_cmp{i+1:03d}"
@@ -167,11 +193,25 @@ def build_abundancias(df: pd.DataFrame, muestras: pd.DataFrame) -> pd.DataFrame:
             })
     return pd.DataFrame(long_rows)
 
-# ---------------------------------------------------------------------------
+
 # Paso 5: guardar en SQLite + Parquet
-# ---------------------------------------------------------------------------
 
 def save_to_sqlite(muestras: pd.DataFrame, compuestos: pd.DataFrame, db_path: str) -> None:
+    """
+    Guarda las tablas de muestras y compuestos en la base SQLite
+    Se guarda en su propia tabla muestras_moreira2024 (no en muestras), porque mezcla columnas que no encajan en el esquema comun 
+    (herbivore_species, treatment_group, height_cm, etc.). Despues hay que correr src/01_unify_schema.py para fusionarla en muestras
+    Parameters:
+    muestras : pandas.DataFrame
+    Salida de build_muestras
+    compuestos : pandas.DataFrame
+    Salida de build_compuestos
+    db_path : str
+    Ruta al archivo SQLite
+    Returns:
+    None
+    Descarta la columna raw_id antes de guardar; reemplaza (if_exists="replace") la tabla muestras_moreira2024, y agrega (append) a la tabla `compuestos` comun
+    """
     Path(db_path).parent.mkdir(parents=True, exist_ok=True)
     con = sqlite3.connect(db_path)
     muestras.drop(columns=["raw_id"]).to_sql(
@@ -182,15 +222,30 @@ def save_to_sqlite(muestras: pd.DataFrame, compuestos: pd.DataFrame, db_path: st
 
 
 def save_to_parquet(abundancias: pd.DataFrame, parquet_path: str) -> None:
+    """
+    Guarda la matriz de abundancias en formato parquet
+    Parameters:
+    abundancias : pandas.DataFrame
+    Salida de build_abundancias
+    parquet_path : str
+    Ruta de destino del archivoparquet
+    Returns:
+    None
+    Crea la carpeta de destino si no existe
+    """
     Path(parquet_path).parent.mkdir(parents=True, exist_ok=True)
     abundancias.to_parquet(parquet_path, index=False)
 
 
-# -----------------------------------------------------------------------------
 # Main
-# ---------------------------------------------------------------------------
 
 def main():
+    """
+    Lee el CSV, arma las tres tablas y las persiste en SQLite (tabla propia muestras_moreira2024) y parquet
+    Returns:
+    None
+    Imprime un resumen de cuantas muestras y compuestos se cargaron, y cuantas filas de abundancia se generaron
+    """
     df = read_csv_raw(CSV_PATH)
 
     muestras = build_muestras(df)
