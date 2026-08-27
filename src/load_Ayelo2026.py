@@ -193,7 +193,7 @@ def save_to_sqlite(muestras: pd.DataFrame, compuestos: pd.DataFrame, db_path: st
     """
     Guarda las tablas de muestras y compuestos en la base SQLite
     Las muestras de Ayelo2026 se guardan en su propia tabla muestras_ayelo2026 (no en muestras), porque tienen columnas propias (cultivar_resistance, pgpr_consortium, etc.) 
-    que no encajan en el esquema comun. Despues hay que correr src/01_unify_schema_v2.py para fusionarlas en muestras
+    que no encajan en el esquema comun. Despues hay que correr src/01_unify_schema.py para fusionarlas en muestras
     Parameters:
     muestras : pandas.DataFrame
     Salida de build_muestras
