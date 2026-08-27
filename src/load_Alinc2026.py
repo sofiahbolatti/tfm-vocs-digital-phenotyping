@@ -5,33 +5,29 @@ Tomate (S. lycopersicum) x T. harzianum T22 (biocontrol) x herbivoria de Halyomo
 Estructura del Excel:
 - Fila 4: encabezados (N, RT, RI, compound, FO 1-5, T22-FO 1-5, CTRL 1-5)
 - Filas 5-27: 23 compuestos (21 identificados + 2 "Unknown")
-- N = ID unico de compuesto tal como viene en el archivo original. 
+- N = ID unico de compuesto
 
-Diseño biologico (es biocontrol x herbivoria):
-- CTRL = plantas no inoculadas, no infestadas (control)
+Diseño biologico
+- CTRL = plantas no inoculadas, no infestadas
 - FO   = plantas no inoculadas + alimentacion/oviposicion de H. halys
 - T22-FO = plantas inoculadas con T. harzianum T22 + alimentacion/oviposicion de H. halys
-- "FO" en el nombre del grupo NO es Fusarium oxysporum, es "Feeding + Oviposition"  del insecto
+- "FO" es "Feeding + Oviposition"  del insecto
 
-Nota sobre abundancias: el archivo usa "0" explicito para picos no detectados. Se preservan como 0.0, no como None, para no perder esa
-distincion frente a valores realmente faltantes.
+Abundancias: el archivo usa "0" explicito para picos no detectados. Se preservan como 0, no como none, para no perder esa distincion frente a valores realmente faltantes
 
-Nota sobre integracion a la DB: este dataset introduce dos ejes biologicos que los loaders anteriores no tenian (especie de herbivoro, agente de biocontrol
-por separado del "patogeno"). Se guarda en una tabla separada (muestras_alinc2026) en vez de la tabla compartida "muestras", 
-hasta que se defina el esquema unificado en la etapa de limpieza.
+Este dataset introduce dos ejes biologicos que los loaders anteriores no tenian (especie de herbivoro, agente de biocontrol por separado del "patogeno"). Se guarda en una 
+tabla separada (muestras_alinc2026).
 """
 
 import re
 import sqlite3
 from datetime import date
 from pathlib import Path
-
 import openpyxl
 import pandas as pd
 
-# ---------------------------------------------------------------------------
+
 # Configuracion
-# ---------------------------------------------------------------------------
 
 EXCEL_PATH = "data/raw/Alinc/rawdata_alinc.xlsx"
 SHEET_NAME = "VOC analysis"
@@ -59,8 +55,7 @@ TREATMENT_MAP = {
     "T22-FO": (BIOCONTROL_AGENT, HERBIVORE, "biocontrol_herbivory"),
 }
 
-# Mapeo compuesto -> PubChem CID, indexado por N (columna "N" del Excel, ID
-# unico de compuesto). Se usa N y no el nombre porque "alpha-terpinene" esta repetido con dos RT/RI distintos.
+# Mapeo compuesto -> PubChem CID, indexado por N (columna "N" del excel, ID unico de compuesto). Se usa N y no el nombre porque "alpha-terpinene" esta repetido con dos RT/RI distintos.
 PUBCHEM_CID_BY_N = {
     1: 17868,     
     2: 6654,     
@@ -88,11 +83,20 @@ PUBCHEM_CID_BY_N = {
 }
 
 
-# ---------------------------------------------------------------------------
 # Paso 1: leer el Excel
-# ---------------------------------------------------------------------------
 
 def read_excel_raw(path: str, sheet: str) -> tuple[list[str], list[list]]:
+    """
+    Lee el excel crudo y separa el encabezado de las filas de datos
+    Parameters:
+    path : str
+    Ruta al archivo excel
+    sheet : str
+    Nombre de la hoja a lee
+    Returns:
+    tuple[list[str], list[list]]
+    header: nombres de columna no vacios de la fila de encabezado; rows: valores crudos de las filas FIRST_DATA_ROW a LAST_DATA_ROW (23 compuestos)
+    """
     wb = openpyxl.load_workbook(path, data_only=True)
     ws = wb[sheet]
     header = [ws.cell(row=HEADER_ROW, column=c).value for c in range(1, ws.max_column + 1)]
@@ -105,6 +109,17 @@ def read_excel_raw(path: str, sheet: str) -> tuple[list[str], list[list]]:
 
 
 def parse_sample_columns(header: list[str]) -> pd.DataFrame:
+    """
+    Identifica las columnas de muestra dentro del encabezado y parsea su grupo de tratamiento y replica
+    Parameters:
+    header : list[str]
+    Encabezado completo, salida de read_excel_raw
+    Precondition:
+    Cada columna de muestra debe matchear el patron "{CTRL|FO|T22-FO} {numero}"; si no,  ValueError
+    Returns:
+    pandas.DataFrame
+    Una fila por columna de muestra, con raw_column, treatment_group y biological_replicate
+    """
     meta_cols = {"N", "RT", "RI", "compound"}
     parsed = []
     for col in header:
@@ -122,14 +137,30 @@ def parse_sample_columns(header: list[str]) -> pd.DataFrame:
     return pd.DataFrame(parsed)
 
 
-# ---------------------------------------------------------------------------
 # Paso 2: construir tabla de muestras
-# ---------------------------------------------------------------------------
 
 def build_muestras(sample_meta: pd.DataFrame) -> pd.DataFrame:
+    """
+    Arma la tabla de metadatos de muestras, traduciendo el grupo de tratamiento  via la funcion interna _map_treatment
+    Parameters:
+    sample_meta : pandas.DataFrame
+    Salida de parse_sample_columns
+    Returns:
+    pandas.DataFrame
+    Una fila por muestra, con sample_id, especie, los tres ejes de tratamiento y metadata fija del dataset, mas raw_column 
+    """
     df = sample_meta.copy()
 
     def _map_treatment(group):
+        """
+        Traduce un grupo de tratamiento a sus 3 componentes biologicos, segun TREATMENT_MAP
+        Parameters:
+        group : str
+        Grupo de tratamiento 
+        Returns:
+        pandas.Series
+        Con fungal_inoculant, herbivore_species y physiological_state
+        """
         fungal, herbivore, state = TREATMENT_MAP[group]
         return pd.Series({
             "fungal_inoculant": fungal,
@@ -166,11 +197,20 @@ def build_muestras(sample_meta: pd.DataFrame) -> pd.DataFrame:
     return df[cols]
 
 
-# ---------------------------------------------------------------------------
 # Paso 3: construir catalogo de compuestos
-# ---------------------------------------------------------------------------
 
 def build_compuestos(header: list[str], rows: list[list]) -> pd.DataFrame:
+    """
+    Arma el catalogo de compuestos, indexando por N 
+    Parameters:
+    header : list[str]
+    Encabezado completo, salida de read_excel_raw
+    rows : list[list]
+    Filas de datos, salida de read_excel_raw
+    Returns:
+    pandas.DataFrame
+    Una fila por compuesto (23 en total), con compuesto_id, n_original, name_original, retention_time, retention_index, identified y pubchem_cid
+    """
     idx_N = header.index("N")
     idx_RT = header.index("RT")
     idx_RI = header.index("RI")
@@ -194,12 +234,25 @@ def build_compuestos(header: list[str], rows: list[list]) -> pd.DataFrame:
     return pd.DataFrame(out)
 
 
-# ---------------------------------------------------------------------------
-# Paso 4: construir matriz de abundancias
-# ---------------------------------------------------------------------------
 
-def build_abundancias(header: list[str], rows: list[list], sample_meta: pd.DataFrame,
-                       muestras: pd.DataFrame) -> pd.DataFrame:
+# Paso 4: construir matriz de abundancias
+
+def build_abundancias(header: list[str], rows: list[list], sample_meta: pd.DataFrame, muestras: pd.DataFrame) -> pd.DataFrame:
+    """
+    Arma la matriz de abundancias en formato largo, preservando los picos no detectados como 0.00
+    Parameters:
+    header : list[str]
+    Encabezado completo, salida de read_excel_raw
+    rows : list[list]
+    Filas de datos, salida de read_excel_raw
+    sample_meta : pandas.DataFrame
+    Salida de parse_sample_columns
+    muestras : pandas.DataFrame
+    Salida de build_muestras
+    Returns:
+    pandas.DataFrame
+    Columnas sample_id, compuesto_id, abundancia y unidad; 345 filas
+    """
     idx_N = header.index("N")
     col_to_sample_id = dict(zip(muestras["raw_column"], muestras["sample_id"]))
     sample_cols = sample_meta["raw_column"].tolist()
@@ -221,11 +274,24 @@ def build_abundancias(header: list[str], rows: list[list], sample_meta: pd.DataF
     return pd.DataFrame(long_rows)
 
 
-# ---------------------------------------------------------------------------
 # Paso 5: pguardar en SQLite + Parquet
-# ---------------------------------------------------------------------------
 
 def save_to_sqlite(muestras: pd.DataFrame, compuestos: pd.DataFrame, db_path: str) -> None:
+    """
+    Guarda las tablas de muestras y compuestos en la base SQLite
+    introduce dos ejes biologicos que los loaders anteriores no tenian (herbivoro y agente de biocontrol por separado del patogeno), asi que se guarda en su propia tabla muestras_alinc2026. 
+    Despues hay que correr src/01_unify_schema.py para fusionarla en `muestras`
+    Parameters:
+    muestras : pandas.DataFrame
+    Salida de build_muestras
+    compuestos : pandas.DataFrame
+    Salida de build_compuestos
+    db_path : str
+    Ruta al archivo SQLite
+    Returns:
+    None
+    Descarta raw_column de muestras y n_original/retention_time/retention_index de compuestos antes de guardar; reemplaza (if_exists="replace") la tabla muestras_alinc2026, y agrega (append) a la tabla `compuestos` comun
+    """
     Path(db_path).parent.mkdir(parents=True, exist_ok=True)
     con = sqlite3.connect(db_path)
     muestras.drop(columns=["raw_column"]).to_sql(
@@ -238,15 +304,30 @@ def save_to_sqlite(muestras: pd.DataFrame, compuestos: pd.DataFrame, db_path: st
 
 
 def save_to_parquet(abundancias: pd.DataFrame, parquet_path: str) -> None:
+    """
+    Guarda la matriz de abundancias en formato parquet
+    Parameters:
+    abundancias : pandas.DataFrame
+    Salida de build_abundancias
+    parquet_path : str
+    Ruta de destino del archivo parquet
+    Returns:
+    None
+    Crea la carpeta de destino si no existe
+    """
     Path(parquet_path).parent.mkdir(parents=True, exist_ok=True)
     abundancias.to_parquet(parquet_path, index=False)
 
 
-# ---------------------------------------------------------------------------
 # Main
-# ---------------------------------------------------------------------------
 
 def main():
+    """
+    Lee el Excel, arma las tres tablas y las persiste en SQLite  y parquet
+    Returns:
+    None
+    Imprime un resumen de cuantas muestras y compuestos se cargaron, y cuantas filas de abundancia se generaron
+    """
     header, rows = read_excel_raw(EXCEL_PATH, SHEET_NAME)
     sample_meta = parse_sample_columns(header)
 
