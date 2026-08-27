@@ -1,27 +1,20 @@
 """
-Loader: Lazazzara et al. 2018 (Scientific Reports, DOI 10.1038/s41598-018-19776-2)
+Loader: Lazazzara et al. 2018 (DOI 10.1038/s41598-018-19776-2)
 Grapevine x Plasmopara viticola - VOCs por HS-SPME-GC-MS
 
-Fuente original: Excel "Metabolites_for_Christoph" recibido directamente de
-Michele Perazzolli / Valentina Lazazzara (Fondazione Edmund Mach).
+Fuente original: Excel "Metabolites_for_Christoph" recibido de Michele Perazzolli / Valentina Lazazzara.
 
-Estructura del Excel (hoja unica "metabolites both exp."):
-- Filas 2-53: compuestos (52 en total: 36 identificados con CAS + 16 picos sin
-  identificar, etiquetados "No match: ...")
-- Columnas A-I: metadatos del compuesto (nombre, CAS, fuente, score, iones de
-  cuantificacion, RI promedio, RT promedio, S/N promedio, hits)
-- Columnas J en adelante (98 columnas): una por muestra individual, con
-  abundancia (area de pico) para ese compuesto en esa muestra
+Estructura del Excel (hoja unica):
+- Filas 2-53: compuestos (52 en total: 36 identificados con CAS + 16 picos sin identificar, etiquetados "No match")
+- Columnas A-I: metadatos del compuesto (nombre, CAS, fuente, score, iones de cuantificacion, RI promedio, RT promedio, S/N promedio, hits)
+- Columnas J en adelante (98 columnas): una por muestra individual, con abundancia (area de pico) para ese compuesto en esa muestra
 - Nombre de columna de muestra: "{experimento}_{genotipo} {timepoint}_{replica}.cmp"
-  ej: "1_Pinot Noir 0dpi_1.cmp", "2_Solaris 6dpi_01.cmp"
 
-Mapeo biologico (confirmado contra el paper original):
+Mapeo biologico:
 - 0dpi = control (antes de inoculacion), 6dpi = infectado con P. viticola (6 dias post-inoculacion)
-- Genotipos: Pinot Noir (V. vinifera, susceptible), BC4 (hibrido M. rotundifolia x
-  V. vinifera, resistente), Kober 5BB / K5BB y SO4 (hibridos V. berlandieri x
+- Genotipos: Pinot Noir (V. vinifera, susceptible), BC4 (hibrido M. rotundifolia x V. vinifera, resistente), Kober 5BB / K5BB y SO4 (hibridos V. berlandieri x
   V. riparia, resistentes), Solaris (cultivar moderno, resistente)
-- experimento 1 y 2 = dos repeticiones del experimento en invernadero (no son
-  timepoints ni replicas bioquimicas, son repeticiones experimentales completas)
+- experimento 1 y 2 = dos repeticiones del experimento en invernadero 
 """
 
 import re
@@ -32,9 +25,9 @@ from pathlib import Path
 import openpyxl
 import pandas as pd
 
-# ---------------------------------------------------------------------------
+
 # Configuracion
-# ---------------------------------------------------------------------------
+
 
 EXCEL_PATH = "data/raw/Lazazzara/rawdata_lazazzara.xlsx"
 SHEET_NAME = "metabolites both exp."
@@ -60,10 +53,7 @@ GENOTYPE_NOTES = {
 SAMPLE_COL_PATTERN = re.compile(r"^(\d+)_(.+) (\d+)dpi_(\d+)\.cmp$")
 DPI_TO_STATE = {0: "control", 6: "infected"}
 
-# Mapeo manual compuesto identificado -> PubChem CID (buscado por CAS, confirmado
-# contra paginas oficiales de PubChem/proveedores). Los compuestos "No match"
-# (picos sin identificar) y los que carecen de CAS (ej. Epizonarene) quedan
-# sin CID porque no hay nada que buscar.
+# Mapeo manual compuesto identificado: PubChem CID (buscado por CAS). Los compuestos "No match" (picos sin identificar) y los que carecen de CAS  quedan sin CID porque no hay nada que buscar
 PUBCHEM_CID_BY_INDEX = {
     1: 637566, 2: 5364752, 3: 521334, 4: 92313, 5: 441005, 6: 442393,
     7: 31253, 8: 6549, 9: 638014, 10: 9895, 11: 5281515, 12: 11463,
@@ -74,12 +64,20 @@ PUBCHEM_CID_BY_INDEX = {
 }
 
 
-# ---------------------------------------------------------------------------
 # Paso 1: leer el Excel
-# ---------------------------------------------------------------------------
 
 def read_excel_raw(path: str, sheet: str) -> pd.DataFrame:
-    """Lee la hoja del Excel tal cual, sin asumir tipos (openpyxl + valores)."""
+    """
+    Lee la hoja del excel. Salta las filas vacias o de metadata del instrumento que quedan al final del export
+    Parameters:
+    path : str
+    Ruta al archivo
+    sheet : str
+    Nombre de la hoja
+    Returns:
+    pandas.DataFrame
+    Una fila por compuesto, con las columnas de metadata y una columna por muestra
+    """
     wb = openpyxl.load_workbook(path, data_only=True)
     ws = wb[sheet]
     header = [ws.cell(row=1, column=c).value for c in range(1, ws.max_column + 1)]
@@ -95,7 +93,17 @@ def read_excel_raw(path: str, sheet: str) -> pd.DataFrame:
 
 
 def parse_sample_columns(columns: list[str]) -> pd.DataFrame:
-    """Parsea los nombres de columna de muestra a sus componentes."""
+    """
+    Parsea los nombres de columna de muestra a sus componentes biologicos, con el formato "{experimento}_{genotipo} {dpi}dpi_{replica}.cmp" 
+    Parameters:
+    columns : list[str]
+    Nombres de columna de muestra
+    Precondition:
+    Cada nombre debe matchear SAMPLE_COL_PATTERN, si no, ValueError
+    Returns:
+    pandas.DataFrame
+    Una fila por muestra, con columnas raw_column, experiment_replicate, genotype, dpi y biological_replicate
+    """
     parsed = []
     for col in columns:
         m = SAMPLE_COL_PATTERN.match(col)
@@ -114,11 +122,19 @@ def parse_sample_columns(columns: list[str]) -> pd.DataFrame:
     return pd.DataFrame(parsed)
 
 
-# ---------------------------------------------------------------------------
 # Paso 2: construir tabla de muestras (metadatos)
-# ---------------------------------------------------------------------------
 
 def build_muestras(sample_meta: pd.DataFrame) -> pd.DataFrame:
+    """
+    Arma la tabla de metadatos de muestras a partir de los componentes ya parseados
+    Traduce dpi a physiological_state via DPI_TO_STATE, arma el sample_id, y completa las columnas del dataset
+    Parameters:
+    sample_meta : pandas.DataFrame
+    Salida de parse_sample_columns
+    Returns:
+    pandas.DataFrame
+    Una fila por muestra, con las columnas del esquema estandar de muestras mas raw_column 
+    """
     df = sample_meta.copy()
     df["physiological_state"] = df["dpi"].map(DPI_TO_STATE)
     df["timepoint"] = df["dpi"].astype(str) + "dpi"
@@ -167,12 +183,19 @@ def build_muestras(sample_meta: pd.DataFrame) -> pd.DataFrame:
     ]
     return df[cols]
 
-
-# ---------------------------------------------------------------------------
 # Paso 3: construir catalogo de compuestos
-# ---------------------------------------------------------------------------
 
 def build_compuestos(raw_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Arma el catalogo de compuestos a partir de las columnas de metadat
+    Marca como identificado todo compuesto en el que el nombre no empiece con "No match", y le asigna el PubChem CID  de PUBCHEM_CID_BY_INDEX cuando existe
+    Parameters:
+    raw_df : pandas.DataFrame
+    Salida de read_excel_raw
+    Returns:
+    pandas.DataFrame
+    Una fila por compuesto, con compuesto_id, name_original, cas, identified, pubchem_cid y el resto de metadata
+    """
     meta_cols = [
         "Metabolite",
         "CAS",
@@ -204,11 +227,22 @@ def build_compuestos(raw_df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-# ---------------------------------------------------------------------------
 # Paso 4: construir matriz de abundancias en formato largo
-# ---------------------------------------------------------------------------
 
 def build_abundancias(raw_df: pd.DataFrame, sample_meta: pd.DataFrame, compuestos: pd.DataFrame) -> pd.DataFrame:
+    """
+    Arma la matriz de abundancias en formato largo  y vuelve a llamar a build_muestras  para obtener el mapeo raw_column a sample_id
+    Parameters:
+    raw_df : pandas.DataFrame
+    Salida de read_excel_raw
+    sample_meta : pandas.DataFrame
+    Salida de parse_sample_columns
+    compuestos : pandas.DataFrame
+    Salida de build_compuestos
+    Returns:
+    pandas.DataFrame
+    Columnas sample_id, compuesto_id, abundancia y unidad; una fila por cada valor de abundancia
+    """
     sample_cols = sample_meta["raw_column"].tolist()
     long_rows = []
     compuesto_ids = compuestos["compuesto_id"].tolist()
@@ -228,11 +262,22 @@ def build_abundancias(raw_df: pd.DataFrame, sample_meta: pd.DataFrame, compuesto
     return pd.DataFrame(long_rows)
 
 
-# ---------------------------------------------------------------------------
 # Paso 5: persistir en SQLite + Parquet
-# ---------------------------------------------------------------------------
 
 def save_to_sqlite(muestras: pd.DataFrame, compuestos: pd.DataFrame, db_path: str) -> None:
+    """
+    Guarda las tablas de muestras y compuestos en la base SQLite. Descarta la columna raw_column antes de guardar muestras 
+    Parameters:
+    muestras : pandas.DataFrame
+    Salida de build_muestras
+    compuestos : pandas.DataFrame
+    Salida de build_compuestos
+    db_path : str
+    Ruta al archivo SQLite
+    Returns:
+    None
+    Escribe (append) en las tablas `muestras` y `compuestos`; crea el archivo si no existen
+    """
     Path(db_path).parent.mkdir(parents=True, exist_ok=True)
     con = sqlite3.connect(db_path)
     muestras.drop(columns=["raw_column"]).to_sql("muestras", con, if_exists="append", index=False)
@@ -241,15 +286,30 @@ def save_to_sqlite(muestras: pd.DataFrame, compuestos: pd.DataFrame, db_path: st
 
 
 def save_to_parquet(abundancias: pd.DataFrame, parquet_path: str) -> None:
+    """
+    Guarda la matriz de abundancias en formato parquet
+    Parameters:
+    abundancias : pandas.DataFrame
+    Salida de build_abundancias
+    parquet_path : str
+    Ruta de destino del archivo 
+    Returns:
+    None
+    Crea la carpeta de destino si no existe
+    """
     Path(parquet_path).parent.mkdir(parents=True, exist_ok=True)
     abundancias.to_parquet(parquet_path, index=False)
 
 
-# ---------------------------------------------------------------------------
 # Main
-# ---------------------------------------------------------------------------
 
 def main():
+    """
+    Orquesta la carga completa del dataset: lee el Excel, separa las columnas de muestra de las de metadata, arma las tres tablas (muestras, compuestos, abundancias) y las persiste en SQLite y parquet
+    Returns:
+    None
+    No devuelve nada, solo  imprime un resumen de cuantas muestras, compuestos y filas de abundancia se cargaron
+    """
     raw_df = read_excel_raw(EXCEL_PATH, SHEET_NAME)
 
     sample_cols = [c for c in raw_df.columns if c not in (
