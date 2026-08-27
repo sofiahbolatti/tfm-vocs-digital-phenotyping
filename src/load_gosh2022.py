@@ -3,27 +3,26 @@ Loader: Ghosh et al. 2022 (DOI 10.3390/insects13090840)
 Tomate (S. lycopersicum) + Pimiento (Capsicum annuum) x virus transmitidos pormosca blanca (Bemisia tabaci) 
 
 
-Estructura de cada hoja (identica en concepto, distinta en nombres de columna):
+Estructura de cada hoja:
 - Fila 4: encabezados: Compound, Cas No, Class, [muestras x 3  grupos], f.value, p.value, -log10(p)/-log(10), FDR
 - Filas 5 en adelante: un compuesto por fila
 - Tomate: 76 compuestos, 15 muestras (5 control + 5 healthy whitefly + 5 virus/TYLCV)
 - Pimiento: 93 compuestos, 14 muestras (5 control + 5 healthy whitefly + 4 virus/PeWBVYV)
-- Abundancia: son valores normalizados contra un estandar interno. Se guardan tal cual, unidad "relative_to_IS".
+- Abundancia: son valores normalizados contra un estandar interno
 
-Diseno biologico (3 grupos por especie):
+Diseno biologico :
 - control = planta sin mosca blanca, sin virus
-- Healthy  = planta infestada con mosca blanca SIN virus (vector sano)
+- Healthy  = planta infestada con mosca blanca SIN virus 
 - Virus = planta infestada con mosca blanca portadora del virus
 """
 import sqlite3
 from datetime import date
 from pathlib import Path
-
 import pandas as pd
 
-# ---------------------------------------------------------------------------
+
+
 # Configuracion
-# ---------------------------------------------------------------------------
 
 EXCEL_PATH = "data/raw/Ghosh/rawdata_ghosh.xlsx"
 
@@ -71,22 +70,45 @@ TREATMENT_TO_STATE = {
 HERBIVORE = "Bemisia tabaci (whitefly)"
 
 
-# -----------------------------------------------------------------------------
 # Paso 1: leer una hoja del Excel
-# ---------------------------------------------------------------------------
 
 def read_sheet(excel_path: str, sheet_name: str) -> pd.DataFrame:
+    """
+    Lee una hoja del Excel de Ghosh2022 (tomate o pimiento) y descarta filas vacias
+    Parameters:
+    excel_path : str
+    Ruta al archivo excel
+    sheet_name : str
+    Nombre de la hoja a leer
+    Returns:
+    pandas.DataFrame
+    Una fila por compuesto
+    """
     df = pd.read_excel(excel_path, sheet_name=sheet_name, header=HEADER_ROW)
     df = df.dropna(subset=[df.columns[0]]).reset_index(drop=True)  
     df.columns = [str(c).strip() for c in df.columns]
     return df
 
 
-# ---------------------------------------------------------------------------
 # Paso 2: construir tabla de muestras
-# ---------------------------------------------------------------------------
 
 def build_species_tables(species_key: str, cfg: dict, df: pd.DataFrame):
+    """
+    Arma las tres tablas (muestras, compuestos, abundancias) 
+    Esta funcion combina los tres pasos porque tomate y pimiento comparten el mismo excel pero con columnas de muestra distintas por especie; se llama una vez por especie
+    Parameters:
+    species_key : str
+    Clave de la especi
+    cfg : dict
+    Configuracion de esa especie (SPECIES_CONFIG[species_key]): nombre de hoja, especie, virus y columnas de muestra por tratamiento
+    df : pandas.DataFrame
+    Salida de read_sheet para esa hoja
+    Precondition:
+    Los compuestos se identifican por posicion , no por nombre; el orden de df debe mantenerse igual entre la construccion de compuestos y de abundancias
+    Returns:
+    tuple[pandas.DataFrame, pandas.DataFrame, pandas.DataFrame]
+    muestras (15 para tomate, 14 para pimiento), compuestos (identified=True) y abundancias en formato largo
+    """
     species = cfg["species"]
     virus = cfg["virus"]
     sample_columns = cfg["sample_columns"]
@@ -116,9 +138,9 @@ def build_species_tables(species_key: str, cfg: dict, df: pd.DataFrame):
             })
     muestras = pd.DataFrame(muestra_rows)
 
-# ---------------------------------------------------------------------------
+    
 # Paso 3: construir un catalogo de compuestos 
-# -----------------------------------------------------------------------------
+
     compuesto_rows = []
     for i, row in df.iterrows():
         compuesto_rows.append({
@@ -133,9 +155,9 @@ def build_species_tables(species_key: str, cfg: dict, df: pd.DataFrame):
         })
     compuestos = pd.DataFrame(compuesto_rows)
 
-  # ----------------------------------------------------------------------------
+
 # Paso 4: construir una matriz de abundancias
-# ---------------------------------------------------------------------------
+
     all_sample_cols = [c for cols in sample_columns.values() for c in cols]
     long_rows = []
     for i, row in df.iterrows():
@@ -152,11 +174,23 @@ def build_species_tables(species_key: str, cfg: dict, df: pd.DataFrame):
     return muestras, compuestos, abundancias
 
 
-# ---------------------------------------------------------------------------
 # Paso 5: guardar en SQLite + Parquet
-# ---------------------------------------------------------------------------
 
 def save_to_sqlite(muestras: pd.DataFrame, compuestos: pd.DataFrame, db_path: str) -> None:
+    """
+    Guarda las tablas de muestras y compuestos en la base SQLite
+    Se guarda en su propia tabla muestras_ghosh2022, porque tiene columnas propias (virus, herbivore_species, treatment_group). Hay que correr src/01_unify_schema.py para fusionarla en `muestras`
+    Parameters:
+    muestras : pandas.DataFrame
+    Tabla combinada de tomate + pimiento
+    compuestos : pandas.DataFrame
+    Tabla combinada de tomate + pimiento
+    db_path : str
+    Ruta al archivo SQLite
+    Returns:
+    None
+    Reemplaza (if_exists="replace") la tabla muestras_ghosh2022, y agrega (append) a la tabla `compuestos` comun
+    """
     Path(db_path).parent.mkdir(parents=True, exist_ok=True)
     con = sqlite3.connect(db_path)
     muestras.to_sql("muestras_ghosh2022", con, if_exists="replace", index=False)
@@ -165,15 +199,30 @@ def save_to_sqlite(muestras: pd.DataFrame, compuestos: pd.DataFrame, db_path: st
 
 
 def save_to_parquet(abundancias: pd.DataFrame, parquet_path: str) -> None:
+    """
+    Guarda la matriz de abundancias en formato parquet
+    Parameters:
+    abundancias : pandas.DataFrame
+    Tabla combinada de tomate + pimiento
+    parquet_path : str
+    Ruta de destino del archivo 
+    Returns:
+    None
+    Crea la carpeta de destino si no existe
+    """
     Path(parquet_path).parent.mkdir(parents=True, exist_ok=True)
     abundancias.to_parquet(parquet_path, index=False)
 
 
-# ---------------------------------------------------------------------------
 # Main
-# -----------------------------------------------------------------------------
 
 def main():
+    """
+    Recorre las dos especies  definidas en SPECIES_CONFIG, arma sus tablas por separado con build_species_tables, las concatena, y las persiste en SQLite y parquet
+    Returns:
+    None
+    Imprime un resumen por especie y un resumen total de muestras, compuestos y filas de abundancia
+    """
     all_muestras, all_compuestos, all_abundancias = [], [], []
 
     for species_key, cfg in SPECIES_CONFIG.items():
@@ -194,7 +243,7 @@ def main():
 
     print()
     print(f"TOTAL muestras: {len(muestras)}")
-    print(f"TOTAL compuestos: {len(compuestos)} (0 con CID por ahora - pendiente)")
+    print(f"TOTAL compuestos: {len(compuestos)} ")
     print(f"TOTAL filas de abundancia: {len(abundancias)}")
 
 
