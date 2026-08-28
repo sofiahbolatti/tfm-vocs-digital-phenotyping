@@ -8,7 +8,7 @@ Estructura del CSV:
 - Unidad de abundancia: nanogramos por hora (ng/h)
 - Sin valores faltantes en los VOCs 
 
-Diseno biologico (5 clases):
+Diseño biologico (5 clases):
 - control      = sin dano foliar (n=12)
 - sclerotinia  = hongo Sclerotinia sclerotiorum (n=11)
 - xanthomonas  = bacteria Xanthomonas campestris pv. campestris (n=14)
