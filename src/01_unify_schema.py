@@ -17,8 +17,6 @@ Este script:
 
 No borra ninguna tabla original
 
-Uso:
-    python src/01_unify_schema_v2.py db/tfm_vocs.db
 """
 
 import json
