@@ -238,6 +238,8 @@ def actualizar():
         elif accion == "confirmar":
             token = request.form.get("token")
             resultado = aplicar_actualizacion(slug, ruta_token_csv(token))
+            if resultado["mejora"]:
+                token = None
 
     meta_actual = load_classifier(slug)["meta"]
 
