@@ -1,4 +1,14 @@
-﻿<!DOCTYPE html>
+{#
+  Template: Interpretabilidad (SHAP))
+  Muestra un grafico de barras horizontal con los compuestos mas importantes para la clasificacion del modelo de la especie seleccionada, segun el valor
+  SHAP promedio de cada compuesto.
+
+  Variables que llegan desde el backend:
+  - especies: especies con clasificador disponible 
+  - slug_actual: especie seleccionada
+  - grafico_html: HTML del grafico 
+#}
+<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -64,5 +74,3 @@
   </div>
 </body>
 </html>
-
-
