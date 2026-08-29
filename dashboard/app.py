@@ -80,7 +80,7 @@ def predictor():
     str
     HTML renderizado de predictor.html,con la prediccion de la muestra existente y, si corresponde, el resultado o error de la prediccion sobre el archivo subido
     """
-    slug = request.args.get("especie", CLASSIFIER_SPECIES[0]["slug"])
+    slug = request.values.get("especie", CLASSIFIER_SPECIES[0]["slug"])
     datos = load_predictor_data(slug)
     matriz = datos["matriz"]
     muestra_id = request.args.get("muestra")
