@@ -1,4 +1,20 @@
-﻿<!DOCTYPE html>
+{#
+  Template: Predictor de estado fisiologico 
+  Dos funciones:
+  1. Elegir una muestra ya existente en la base y ver la prediccion del clasificador vs. su estado real (con probabilidades por clase).
+  2. Subir un CSV con  muestras NUEVAS (sin physiological_state) y obtener la prediccion para cada una. Para Ghosh2022 (dos especies en un
+     mismo clasificador) se pide ademas la subespecie, porque el CSV nuevo no trae esa columna y hay que completarla a mano.
+
+  Variables que llegan desde el backend:
+  - especies: especies con clasificador 
+  - slug_actual: especie seleccionada 
+  - muestras_ids / muestra_actual: muestras existentes disponibles
+  - prediccion / real / probas: prediccion sobre la muestra existente elegida
+  - meta: metadata del modelo actual (f1_macro_test)
+  - resultado_nuevo: lista de predicciones para el CSV subido (o None)
+  - error_nuevo: mensaje de error si fallo la prediccion sobre el CSV subido
+#}
+<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
