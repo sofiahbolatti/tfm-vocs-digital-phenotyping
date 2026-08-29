@@ -1,4 +1,16 @@
-﻿<!DOCTYPE html>
+{#
+  Template: Exploracion de datos (EDA)
+  Muestra, para la especie seleccionada: el total de muestras, un resumen decuantas muestras hay por estado fisiologico, y un boxplot  de los
+  5 compuestos con mayor varianza entre estados fisiologicos.
+
+  Variables que llegan desde el backend:
+  - especies: lista de especies disponibles
+  - slug_actual: especie seleccionada
+  - n_muestras: cantidad total de muestras de la especie
+  - resumen_clases: lista de dicts {physiological_state, n_muestras}
+  - grafico_html: HTML del grafico 
+#}
+<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -75,5 +87,3 @@
   </div>
 </body>
 </html>
-
-
