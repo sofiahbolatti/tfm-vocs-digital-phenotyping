@@ -1,4 +1,18 @@
-﻿<!DOCTYPE html>
+{#
+  Template: Generador de hipotesis
+  Toma una muestra real como punto de partida y una condicion objetivo, y usa el CVAE para generar (reconstruir) un perfil hipotetico bajo esa condicion.
+  Evalua el perfil generado contra Isolation Forest y Autoencoder (validacion loo) para clasificarlo como plausible / frontera / novedoso.
+
+  Variables que llegan desde el backend:
+  - especies: especies con CVAE disponible 
+  - slug_actual: especie seleccionada
+  - muestras_ids: ids de muestras disponibles como punto de partida
+  - muestra_actual: muestra seleccionada
+  - categorias: condiciones objetivo posible
+  - resultado: salida de generar_hipotesis (condicion_actual, condicion_objetivo, clasificacion, percentil_isolation_forest, percentil_autoencoder,
+    nota_cualitativa si no hay evaluacion cuantitativa disponible)
+#}
+<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
