@@ -1,4 +1,16 @@
-﻿<!DOCTYPE html>
+{#
+  Template: Actualizador de modelo
+  Permite subir un CSV con muestras nuevas de una especie, evaluar si mejoran el F1 macro del clasificador actual  y, si mejora,
+  confirmar el reemplazo del modelo guardado en disco.
+
+  Variables que llegan desde el backend:
+  - especies: especies actualizables 
+  - slug_actual: especie seleccionada 
+  - meta_actual: metadata del modelo actual (modelo, f1_macro_test)
+  - resultado: salida de entrenar_y_evaluar / aplicar_actualizacion (o None)
+  - token: identifica el CSV subido mientras el cambio no fue confirmado
+#}
+<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -102,5 +114,3 @@
   </div>
 </body>
 </html>
-
-
