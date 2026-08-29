@@ -1,25 +1,23 @@
 # Datos crudos y procesados: regenerables desde data/raw/ + los loaders de src/
-# (ver Memoria_TFM: "los datos... quedan fuera del control de versiones porque
-# son regenerables en cualquier momento volviendo a correr los scripts de carga")
+
 data/raw/
 db/tfm_vocs.db
 db/data/processed/*.parquet
 db/data/processed/*.csv
 
-# Nota: models/ NO se ignora a proposito (decision D5.4) - sin esos artefactos
-# entrenados, nadie que clone el repo puede abrir el dashboard sin reentrenar.
+# Nota: models/ NO se ignora a proposito, sin esos artefactos  entrenados, nadie que clone el repo puede abrir el dashboard sin reentrenar
 
 # Cache de Python / Jupyter
 __pycache__/
 *.pyc
 .ipynb_checkpoints/
 
-# Archivos temporales del dashboard (Modulo 6, CSVs subidos para reentrenar)
+# Archivos temporales del dashboard 
 dashboard/_uploads_tmp/
 
 # Carpeta de limpieza temporal (revision de archivos sin usar)
 _to_delete/
 
-# Sistema operativo / editor
+# Sistema operativo/editor
 .DS_Store
 Thumbs.db
