@@ -201,6 +201,7 @@ def save_to_sqlite(muestras: pd.DataFrame, compuestos: pd.DataFrame, db_path: st
     Guarda las tablas de muestras y compuestos en la base SQLite
     Se guarda en su propia tabla muestras_moreira2024 (no en muestras), porque mezcla columnas que no encajan en el esquema comun 
     (herbivore_species, treatment_group, height_cm, etc.). Despues hay que correr src/01_unify_schema.py para fusionarla en muestras
+    Antes de agregar a la tabla `compuestos` comun, borra las filas existentes de este dataset para evitar duplicados
     Parameters:
     muestras : pandas.DataFrame
     Salida de build_muestras
@@ -210,14 +211,16 @@ def save_to_sqlite(muestras: pd.DataFrame, compuestos: pd.DataFrame, db_path: st
     Ruta al archivo SQLite
     Returns:
     None
-    Descarta la columna raw_id antes de guardar; reemplaza (if_exists="replace") la tabla muestras_moreira2024, y agrega (append) a la tabla `compuestos` comun
+    Descarta la columna raw_id antes de guardar; reemplaza (if_exists="replace") la tabla muestras_moreira2024, y agrega a la tabla `compuestos` comun
     """
     Path(db_path).parent.mkdir(parents=True, exist_ok=True)
     con = sqlite3.connect(db_path)
+    con.execute("DELETE FROM compuestos WHERE dataset_origin = ?", (DATASET_ORIGIN,))
     muestras.drop(columns=["raw_id"]).to_sql(
         "muestras_moreira2024", con, if_exists="replace", index=False
     )
     compuestos.to_sql("compuestos", con, if_exists="append", index=False)
+    con.commit()
     con.close()
 
 
