@@ -194,6 +194,7 @@ def save_to_sqlite(muestras: pd.DataFrame, compuestos: pd.DataFrame, db_path: st
     Guarda las tablas de muestras y compuestos en la base SQLite
     Las muestras de Ayelo2026 se guardan en su propia tabla muestras_ayelo2026 (no en muestras), porque tienen columnas propias (cultivar_resistance, pgpr_consortium, etc.) 
     que no encajan en el esquema comun. Despues hay que correr src/01_unify_schema.py para fusionarlas en muestras
+    Antes de agregar a la tabla compuestos comun, borra las filas existentes de este dataset para evitar duplicados
     Parameters:
     muestras : pandas.DataFrame
     Salida de build_muestras
@@ -203,14 +204,16 @@ def save_to_sqlite(muestras: pd.DataFrame, compuestos: pd.DataFrame, db_path: st
     Ruta al archivo SQLite
     Returns:
     None
-    Reemplaza (if_exists="replace") la tabla muestras_ayelo2026, y agrega (append) a la tabla compuestos comun
+    Reemplaza (if_exists="replace") la tabla muestras_ayelo2026, y agrega  a la tabla compuestos comun
     """
     Path(db_path).parent.mkdir(parents=True, exist_ok=True)
     con = sqlite3.connect(db_path)
+    con.execute("DELETE FROM compuestos WHERE dataset_origin = ?", (DATASET_ORIGIN,))
     muestras.to_sql("muestras_ayelo2026", con, if_exists="replace", index=False)
     compuestos.drop(columns=["voc_column"]).to_sql(
         "compuestos", con, if_exists="append", index=False
     )
+    con.commit()
     con.close()
 
 
