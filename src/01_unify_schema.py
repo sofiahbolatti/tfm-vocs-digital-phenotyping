@@ -211,6 +211,6 @@ def migrar(db_path: str):
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
-        print("Uso: python src/01_unify_schema_v2.py db/tfm_vocs.db")
+        print("Uso: python src/01_unify_schema.py db/tfm_vocs.db")
         sys.exit(1)
     migrar(sys.argv[1])
