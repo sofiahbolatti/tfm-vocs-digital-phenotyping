@@ -1,3 +1,7 @@
 # src
 
-Codigo fuente del pipeline: carga y limpieza de datos, construccion de la base SQLite/Parquet, entrenamiento de modelos (clasificador, CVAE, Isolation Forest) y utilidades compartidas.
+En esta sección se encuentra el codigo fuente del pipeline: 
+- Carga y limpieza de datos
+- Construccion de la base SQLite/Parquet
+- Entrenamiento de modelos (clasificador, CVAE, Isolation Forest) 
+- Utilidades compartidas
