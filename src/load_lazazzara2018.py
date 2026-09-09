@@ -276,12 +276,15 @@ def save_to_sqlite(muestras: pd.DataFrame, compuestos: pd.DataFrame, db_path: st
     Ruta al archivo SQLite
     Returns:
     None
-    Escribe (append) en las tablas `muestras` y `compuestos`; crea el archivo si no existen
+    Borra y vuelve a escribir las filas de este dataset en las tablas `muestras` y `compuestos`, crea el archivo si no existen    
     """
     Path(db_path).parent.mkdir(parents=True, exist_ok=True)
     con = sqlite3.connect(db_path)
+    con.execute("DELETE FROM muestras WHERE dataset_origin = ?", (DATASET_ORIGIN,))
+    con.execute("DELETE FROM compuestos WHERE dataset_origin = ?", (DATASET_ORIGIN,))
     muestras.drop(columns=["raw_column"]).to_sql("muestras", con, if_exists="append", index=False)
     compuestos.to_sql("compuestos", con, if_exists="append", index=False)
+    con.commit()
     con.close()
 
 
