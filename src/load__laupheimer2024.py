@@ -214,7 +214,7 @@ def build_abundancias(voc_data, muestras):
 def save_to_sqlite(muestras, compuestos, db_path):
     """
     Guarda las tablas de muestras y compuestos en la base SQLite
-    Laupeimer comparte esquema con Lazazzara y se guarda directo en la tabla `muestras` comun (append)
+    Laupeimer comparte esquema con Lazazzara y se guarda directo en la tabla `muestras` comun
     Parameters:
     muestras : pandas.DataFrame
     Salida de build_muestras
@@ -224,16 +224,19 @@ def save_to_sqlite(muestras, compuestos, db_path):
     Ruta al archivo SQLite
     Returns:
     None
-    Descarta la columna raw_label antes de guardar muestras; crea el archivo si no existe
+    Borra y vuelve a escribir las filas de este dataset en las tablas `muestras` y `compuestos`, descarta la columna raw_label antes de guardar muestras y crea el archivo si no existe
     """
     Path(db_path).parent.mkdir(parents=True, exist_ok=True)
     con = sqlite3.connect(db_path)
+    con.execute("DELETE FROM muestras WHERE dataset_origin = ?", (DATASET_ORIGIN,))
+    con.execute("DELETE FROM compuestos WHERE dataset_origin = ?", (DATASET_ORIGIN,))
     muestras.drop(columns=["raw_label"]).to_sql(
         "muestras", con, if_exists="append", index=False
     )
     compuestos.to_sql(
         "compuestos", con, if_exists="append", index=False
     )
+    con.commit()
     con.close()
 
 def save_to_parquet(abundancias, parquet_path):
