@@ -280,6 +280,7 @@ def save_to_sqlite(muestras: pd.DataFrame, compuestos: pd.DataFrame, db_path: st
     """
     Guarda las tablas de muestras y compuestos en la base SQLite
     introduce dos ejes biologicos que los loaders anteriores no tenian (herbivoro y agente de biocontrol por separado del patogeno), asi que se guarda en su propia tabla muestras_alinc2026. 
+    Antes de agregar a la tabla `compuestos` comun, borra las filas existentes de este dataset para evitar duplicados
     Despues hay que correr src/01_unify_schema.py para fusionarla en `muestras`
     Parameters:
     muestras : pandas.DataFrame
@@ -294,12 +295,14 @@ def save_to_sqlite(muestras: pd.DataFrame, compuestos: pd.DataFrame, db_path: st
     """
     Path(db_path).parent.mkdir(parents=True, exist_ok=True)
     con = sqlite3.connect(db_path)
+    con.execute("DELETE FROM compuestos WHERE dataset_origin = ?", (DATASET_ORIGIN,))
     muestras.drop(columns=["raw_column"]).to_sql(
         "muestras_alinc2026", con, if_exists="replace", index=False
     )
     compuestos.drop(columns=["n_original", "retention_time", "retention_index"]).to_sql(
         "compuestos", con, if_exists="append", index=False
     )
+    con.commit()
     con.close()
 
 
