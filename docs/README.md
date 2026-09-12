@@ -1,3 +1,3 @@
-# docs
+# Docs
 
-Documentacion del proyecto: propuesta de TFM, notas metodologicas, registro de datasets evaluados y material de apoyo para la memoria.
+Documentacion del proyecto: Memoria, Registro de decisiónes, vidéo de defensa y archivos accesorios de prueba
