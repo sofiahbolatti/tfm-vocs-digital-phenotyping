@@ -1,4 +1,4 @@
-# TFM: Fenotipado digital basado en VOCs para modelar la interacción planta-microorganismo y la resilencia vegetal mediante apredizaje automático.
+# TFM: Fenotipado digital basado en VOCs.
 
 Trabajo de Fin de Master — Master de Formacion Permanente en Big Data, Data Science e Inteligencia Artificial, Universidad Complutense de Madrid (UCM).
 
@@ -15,7 +15,7 @@ Desarrollar un pipeline de machine learning para el fenotipado digital de estado
 2. Modelo generativo central: Conditional Variational Autoencoder (CVAE), un modelo por especie, aprende un espacio latente de 2 dimensiones condicionado al estado fisiologico
 3. Deteccion de anomalias: Isolation Forest + autoencoder de reconstruccion, evaluan la plausibilidad biologica de perfiles generados por el CVAE
 4. Visualizacion del espacio latente: proyeccion directa en 2 dimensiones (el CVAE se diseño con latent_dim=2, sin necesidad de reduccion de dimensionalidad)
-5. Dashboard interactivo (Flask + Plotly) con seis modulos: exploracion de datos (EDA), predictor, interpretabilidad SHAP, navegador del espacio latente, generador de hipotesis, y actualizador de modelo (reentrenamiento validado por humano)
+5. Dashboard interactivo con seis modulos: exploracion de datos (EDA), predictor, interpretabilidad SHAP, navegador del espacio latente, generador de hipotesis, y actualizador de modelo (reentrenamiento)
 
 La combinacion CVAE + Isolation Forest aplicada a perfiles VOC de plantas es una aproximacion no reportada previamente en la literatura de volatilomica.
 
