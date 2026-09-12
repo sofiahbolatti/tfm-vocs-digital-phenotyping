@@ -24,7 +24,6 @@ def index():
     Pagina de inicio, con el menu de los seis modulos disponibles
     Returns:
     str
-    HTML renderizado de index.html
     """
     return render_template("index.html", modulos=MODULOS)
 
@@ -33,11 +32,10 @@ def eda():
     """
     Modulo EDA: conteo de muestras por estado y boxplot de los 5  compuestos con mayor variacion entre estados
     Parameters:
-    especie : str, query param opcional
-    Slug de la especie. Si no se pasa, usa la primera especie de la lista
+    especie : str
+    Si no se pasa, usa la primera especie de la lista
     Returns:
     str
-    HTML renderizado de eda.html, con el resumen de clases y el grafico Plotly embebido
     """
     slug = request.args.get("especie", CLASSIFIER_SPECIES[0]["slug"])
     datos = load_eda_data(slug)
@@ -68,17 +66,15 @@ def predictor():
     """
     Modulo Predictor: muestra la prediccion del clasificador sobre una muestra existente y, si se sube un CSV, predice tambien sobre muestras nuevas
     Parameters:
-    especie : str, query/form param opcional
-    Slug de la especie 
-    muestra : str, query param opcional
+    especie : str+ 
+    muestra : str
     sample_id de una muestra existente a mostrar. Si no existe, usa la primera
     archivo : file, form param opcional (post)
     CSV con muestras nuevas a predecir
-    especie_ghosh : str, form param opcional (post  y solo para Ghosh2022)
-    Subespecie de la muestra nueva ("Solanum lycopersicum" o "Capsicum annuum")
+    especie_ghosh : str, (post  y solo para Ghosh2022)
+    Subespecie de la muestra nueva
     Returns:
     str
-    HTML renderizado de predictor.html,con la prediccion de la muestra existente y, si corresponde, el resultado o error de la prediccion sobre el archivo subido
     """
     slug = request.values.get("especie", CLASSIFIER_SPECIES[0]["slug"])
     datos = load_predictor_data(slug)
@@ -127,11 +123,9 @@ def shap_module():
     """
     Modulo SHAP: compuestos mas importantes para el clasificador , segun su importancia SHAP promedio
     Parameters:
-    especie : str, query param opcional
-    Slug de la especie
+    especie : str
     Returns:
     str
-    HTML renderizado de shap.html, con el grafico de barras Plotly 
     """
     slug = request.args.get("especie", CLASSIFIER_SPECIES[0]["slug"])
     resumen = compute_shap_summary(slug)
@@ -151,15 +145,13 @@ def hipotesis():
     """
     Modulo Generador de hipotesis: genera un perfil VOC hipotetico para una muestra existente bajo una condicion fisiologica objetivo distinta, usando el CVAE de su especie
     Parameters:
-    especie : str, query param opcional
-    Slug del bloque CVAE 
-    muestra : str, query param opcional
+    especie : str
+    muestra : str
     sample_id de la muestra de partida. Si no existe, usa la primera de la especie
-    condicion : str, query param opcional
+    condicion : str
     Estado fisiologico objetivo. Si no es valido, usa la ultima categoria de la lista
     Returns:
     str
-    HTML renderizado de hipotesis.html, con el resultado de generar_hipotesis
     """
     slug = request.args.get("especie", CVAE_SPECIES[0]["slug"])
     matriz, estados = load_cvae_sample_matrix(slug)
@@ -191,11 +183,9 @@ def latente():
     """
     Modulo Espacio latente: proyecta todas las muestras de una especie al espacio latente 2D del CVAE, coloreadas por estado
     Parameters:
-    especie : str, query param opcional
-    Slug del bloque CVAE
+    especie : str
     Returns:
     str
-    HTML renderizado de latente.html, con el grafico de dispersion Plotly  
     """
     slug = request.args.get("especie", CVAE_SPECIES[0]["slug"])
     df = compute_latent_space(slug)
@@ -213,18 +203,16 @@ def actualizar():
     """
     Modulo Actualizador de modelo: flujo de dos pasos para reentrenar el clasificador de una especie con muestras nuevas, validado por humano antes de reemplazar el modelo en produccion
     Parameters:
-    especie : str, query/form param opcional
-    Slug de la especie a actualizar 
-    accion : str, form param opcional (post)
+    especie : str
+    accion : str
     "probar" entrena un modelo candidato con un CSV nuevo sin guardar nada; "confirmar" aplica la actualizacion ya probada
     archivo : file, form param opcional (POST, accion="probar")
     CSV con las muestras nuevas a evaluar
-    token : str, form param opcional (post, accion="confirmar")
+    token : str, (post, accion="confirmar")
     Token del CSV ya guardado, devuelto por el paso "probar"
     "confirmar" solo deberia ejecutarse sobre un token generado por un "probar" previo, para no aplicar una actualizacion sin haber comparado antes el desempeno del modelo candidato
     Returns:
     str
-    HTML renderizado de actualizar.html, con los metadatos del modelo actual y, si se ejecuto una accion, su resultado (y el token)
     """
     slug = request.values.get("especie", ACTUALIZABLES[0]["slug"])
     resultado = None
